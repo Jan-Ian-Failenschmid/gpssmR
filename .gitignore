@@ -1,0 +1,13 @@
+.Rproj.user
+
+# compiled objects
+*.o
+*.so
+*.dll
+
+.Rhistory
+.RData
+.DS_Store
+
+# VSCode
+.vscode/

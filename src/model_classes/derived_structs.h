@@ -1,0 +1,334 @@
+#ifndef DERIVED_STRUCTS_H
+#define DERIVED_STRUCTS_H
+
+#include <RcppArmadillo.h>
+#include "base_structs.h"
+#include "imc_gp_class.h"
+#include "hsgp_class.h"
+
+struct mn_iw_model_ : public model_base
+{
+    std::unique_ptr<iw_model_> iw;
+    std::unique_ptr<mn_conjugate_base> mn;
+
+    mn_iw_model_(std::unique_ptr<mn_conjugate_base> mn_model_,
+                 std::unique_ptr<iw_model_> iw_model_)
+        : iw(std::move(iw_model_)),
+          mn(std::move(mn_model_)) {};
+
+    void calc_posterior_parameters() override
+    {
+        mn->calc_posterior_parameters();
+        // iw.set_data_mean(mn.get_marginal_mean());
+        // iw.set_data_col_cov(mn.get_marginal_col_cov());
+        iw->calc_posterior_parameters();
+    };
+
+    void sample_prior() override
+    {
+        iw->sample_prior();
+        mn->set_row_cov(iw->get_cov());
+        mn->sample_prior();
+    };
+
+    void sample_posterior() override
+    {
+        iw->sample_posterior();
+        mn->set_row_cov(iw->get_cov());
+        mn->sample_posterior();
+    };
+
+    double log_marginal_likelihood() override
+    {
+        marginal_log_likelihood = iw->log_marginal_likelihood();
+        return marginal_log_likelihood;
+    };
+
+    // Setters
+    void set_data(const Dataset &data,
+                  const arma::mat &data_mean_,
+                  const arma::mat &data_cov_)
+    {
+        // Doing anything or am I just copying matrices for fun?
+        // model_base::set_data(data, data_mean_, data_cov_);
+        mn->set_data(data, data_mean_, data_cov_);
+        iw->set_data(data, mn->get_marginal_mean(),
+                     mn->get_marginal_cov());
+    };
+
+    // Getters
+    arma::mat get_cov()
+    {
+        return iw->get_cov();
+    };
+
+    arma::mat get_param()
+    {
+        return mn->get_param();
+    };
+};
+
+struct mn_mn_model_ : public mn_conjugate_base
+{
+    std::unique_ptr<mn_conjugate_base> mn1;
+    std::unique_ptr<mn_conjugate_base> mn2;
+
+    mn_mn_model_(std::unique_ptr<mn_conjugate_base> mn1_model_,
+                 std::unique_ptr<mn_conjugate_base> mn2_model_)
+        : mn1(std::move(mn1_model_)),
+          mn2(std::move(mn2_model_)) {};
+
+    void calc_posterior_parameters() override
+    {
+        mn1->calc_posterior_parameters();
+        mn2->calc_posterior_parameters();
+    };
+
+    void sample_prior() override
+    {
+        mn1->sample_prior();
+        mn2->sample_prior();
+    };
+
+    void sample_posterior() override
+    {
+        mn2->sample_posterior();
+        mn1->sample_posterior();
+    };
+
+    double log_marginal_likelihood() override
+    {
+        marginal_log_likelihood = mn2->log_marginal_likelihood();
+        return marginal_log_likelihood;
+    };
+
+    // Setters
+    void set_data(const Dataset &data,
+                  const arma::mat &data_mean_,
+                  const arma::mat &data_cov_)
+    {
+        mn1->set_data(data, data_mean_, data_cov_);
+        mn2->set_data(data, mn1->get_marginal_mean(),
+                      mn1->get_marginal_cov());
+    };
+
+    void set_row_cov(const arma::mat &row_cov_) override
+    {
+        mn1->set_row_cov(row_cov_);
+        mn2->set_row_cov(row_cov_);
+    };
+
+    // Getters
+    arma::mat get_param1()
+    {
+        return mn1->get_param();
+    };
+
+    arma::mat get_param2()
+    {
+        return mn2->get_param();
+    };
+
+    arma::mat get_marginal_mean() override
+    {
+        return mn2->get_marginal_mean();
+    }
+
+    arma::mat get_marginal_cov() override
+    {
+        return mn2->get_marginal_cov();
+    }
+};
+
+struct mvn_iw_model_ : public model_base
+{
+    std::unique_ptr<iw_model_> iw;
+    std::unique_ptr<mvn_regression_model_> mvn;
+
+    Dataset data;
+
+    mvn_iw_model_(std::unique_ptr<mvn_regression_model_> mvn_model_,
+                  std::unique_ptr<iw_model_> iw_model_)
+        : iw(std::move(iw_model_)),
+          mvn(std::move(mvn_model_))
+    {
+        iw->sample_prior();
+    };
+
+    void calc_posterior_parameters() override
+    {
+        mvn->set_data(data, data_mean, iw->get_cov());
+        mvn->calc_posterior_parameters();
+    };
+
+    void sample_prior() override
+    {
+        iw->sample_prior();
+        mvn->sample_prior();
+    };
+
+    void sample_posterior() override
+    {
+        mvn->sample_posterior();
+        iw->set_data(data, mvn->get_param() * *mvn->predictor,
+                     identity(n_time));
+        iw->calc_posterior_parameters();
+        iw->sample_posterior();
+    };
+
+    double log_marginal_likelihood() override
+    {
+        return 0;
+    };
+
+    // Setters
+    void set_data(const Dataset &data,
+                  const arma::mat &data_mean_)
+    {
+        this->data = data;
+        outcome = data.outcome;
+        data_mean = data_mean_;
+
+        n_time = outcome->n_cols;
+        d_outcome = outcome->n_rows;
+
+        mvn->set_data(data, data_mean_, iw->get_cov());
+        iw->set_data(data,
+                     mvn->get_param() * *mvn->predictor, identity(n_time));
+    };
+
+    // Getters
+    arma::mat get_cov()
+    {
+        return iw->get_cov();
+    };
+
+    arma::mat get_param()
+    {
+        return mvn->get_param();
+    };
+};
+
+struct mn_gp_mean_model_ : public mn_mean_model_
+{
+    std::unique_ptr<imc_gp> gp;
+
+    size_t predictor_idx;
+    const arma::mat *predictor = nullptr;
+
+    mn_gp_mean_model_(std::unique_ptr<imc_gp> gp_,
+                      const arma::mat &row_cov_,
+                      size_t predictor_idx_)
+        : mn_mean_model_(arma::mat(), row_cov_, arma::mat()),
+          gp(std::move(gp_)), predictor_idx(predictor_idx_)
+    {
+        set_row_cov(row_cov_);
+    };
+
+    void calc_posterior_parameters() override
+    {
+        gp->update_test_data(*predictor);
+        gp->compute_predictive(false);
+        param_posterior = gp->pred_mean;
+        col_cov_posterior_chol = gp->pred_col_cov_chol;
+        col_cov_posterior = col_cov_posterior_chol * col_cov_posterior_chol.t();
+    };
+
+    void sample_prior() override
+    {
+        set_param_prior();
+        set_col_cov_prior();
+        rmatnorm(param, param_prior,
+                 row_cov_chol, col_cov_prior_chol);
+    };
+
+    // Setters
+    void set_hyperparameters(const double &alpha, const double &rho)
+    {
+        gp->update_hyperparameters(alpha, rho);
+        set_col_cov_prior();
+    };
+
+    void set_row_cov(const arma::mat &row_cov_) override
+    {
+        row_cov = row_cov_;
+        row_cov_chol = chol(row_cov, "lower");
+        gp->update_sigma(row_cov);
+    };
+
+    void set_param_prior()
+    {
+        param_prior = gp->train_mu;
+    };
+
+    void set_col_cov_prior()
+    {
+        col_cov_prior_chol = gp->train_k_chol;
+        col_cov_prior = gp->train_k_chol * gp->train_k_chol.t();
+    };
+
+    void set_data(const Dataset &data,
+                  const arma::mat &data_mean_,
+                  const arma::mat &data_cov_)
+    {
+        mn_mean_model_::set_data(data, data_mean_, data_cov_);
+        predictor = data.predictors[predictor_idx];
+        gp->update_train_data(*predictor, *outcome - data_mean);
+        gp->set_train_y_cov(data_cov_);
+        set_param_prior();
+        set_col_cov_prior();
+    };
+};
+
+struct mn_hsgp_regression_model_ : public mn_regression_model_
+{
+    std::unique_ptr<hsgp_approx> hsgp;
+
+    mn_hsgp_regression_model_(
+        std::unique_ptr<hsgp_approx> hsgp_,
+        const arma::mat &row_cov_,
+        size_t predictor_idx_)
+        : mn_regression_model_(arma::mat(),
+                               arma::mat(),
+                               row_cov_,
+                               predictor_idx_),
+          hsgp(std::move(hsgp_))
+    {
+
+        arma::uword d_cols = hsgp->indices.n_rows;
+        arma::uword d_rows = row_cov_.n_rows;
+
+        param_prior.zeros(d_rows, d_cols);
+        param.set_size(d_rows, d_cols);
+        param_posterior.set_size(d_rows, d_cols);
+
+        set_col_cov_prior();
+        col_cov_posterior.set_size(d_cols, d_cols);
+        col_cov_posterior_chol.set_size(d_cols, d_cols);
+    };
+
+    void set_hyperparameters(const double &alpha, const double &rho)
+    {
+        hsgp->update_hyperparameters(alpha, rho);
+        set_col_cov_prior();
+    };
+
+    void set_col_cov_prior()
+    {
+        mn_regression_model_::set_col_cov_prior(hsgp->scale());
+    };
+
+    void set_data(const Dataset &data,
+                  const arma::mat &data_mean_,
+                  const arma::mat &data_cov_)
+    {
+        hsgp->phi_transform(*data.predictors[predictor_idx]);
+        predictor = &hsgp->phi;
+        d_predictor = predictor->n_rows;
+
+        // Data cov is currently fixed to be I
+        mn_conjugate_base::set_data(data, data_mean_, data_cov_);
+    };
+};
+
+#endif

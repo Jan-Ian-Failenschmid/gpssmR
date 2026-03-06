@@ -1,0 +1,10 @@
+useDynLib(gpssmR, .registration=TRUE)
+exportMethods(
+    "initialize",
+    "show" 
+)
+exportClasses(
+    "gen_model" 
+)
+importFrom(Rcpp, evalCpp)
+exportPattern("^[[:alpha:]]+")
