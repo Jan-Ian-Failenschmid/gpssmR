@@ -60,6 +60,24 @@ struct model_base
     };
 };
 
+struct regression_base
+{
+    size_t predictor_idx;
+    const arma::mat *predictor = nullptr;
+
+    regression_base(size_t predictor_idx_)
+        : predictor_idx(predictor_idx_) {}
+    virtual ~regression_base() = default;
+};
+
+struct gp_base
+{
+    virtual ~gp_base() = default;
+
+    virtual void set_hyperparameters(double alpha, double rho) = 0;
+    virtual arma::mat get_gp_predictions() = 0;
+};
+
 // Base model for matrix normal likelihood with Inverse-Wishart prior
 struct iw_model_ : public model_base
 {
@@ -291,16 +309,14 @@ struct mn_mean_model_ : public mn_conjugate_base
     };
 };
 
-struct mn_regression_model_ : public mn_conjugate_base
+struct mn_regression_model_ : public mn_conjugate_base, public regression_base
 {
-    size_t predictor_idx;
-    const arma::mat *predictor = nullptr;
     mn_regression_model_(const arma::mat &param_prior_,
                          const arma::mat &col_cov_,
                          const arma::mat &row_cov_,
                          size_t predictor_idx_)
         : mn_conjugate_base(param_prior_, col_cov_, row_cov_),
-          predictor_idx(predictor_idx_) {};
+          regression_base(predictor_idx_) {};
 
     void calc_posterior_parameters() override
     {
@@ -348,7 +364,7 @@ struct mn_regression_model_ : public mn_conjugate_base
     };
 };
 
-struct mvn_regression_model_ : public model_base
+struct mvn_regression_model_ : public model_base, public regression_base
 {
     arma::mat param; // Regression coefficients
     arma::vec sample_param;
@@ -384,9 +400,6 @@ struct mvn_regression_model_ : public model_base
     arma::mat D;
     arma::vec d;
 
-    size_t predictor_idx;
-    const arma::mat *predictor = nullptr;
-
     mvn_regression_model_(const arma::mat &mean_prior_,
                           const arma::mat &cov_prior_,
                           const arma::mat &constraints_,
@@ -394,7 +407,7 @@ struct mvn_regression_model_ : public model_base
         : mean_prior(mean_prior_),
           cov_prior(cov_prior_),
           constraints(constraints_),
-          predictor_idx(predictor_idx_)
+          regression_base(predictor_idx_)
     {
         param.set_size(constraints.n_rows, constraints.n_cols);
 

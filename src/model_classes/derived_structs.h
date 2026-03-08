@@ -2,6 +2,7 @@
 #define DERIVED_STRUCTS_H
 
 #include <RcppArmadillo.h>
+#include "linear_algebra.h"
 #include "base_structs.h"
 #include "imc_gp_class.h"
 #include "hsgp_class.h"
@@ -209,18 +210,15 @@ struct mvn_iw_model_ : public model_base
     };
 };
 
-struct mn_gp_mean_model_ : public mn_mean_model_
+struct mn_gp_mean_model_ : public mn_mean_model_, public gp_base, public regression_base
 {
     std::unique_ptr<imc_gp> gp;
-
-    size_t predictor_idx;
-    const arma::mat *predictor = nullptr;
 
     mn_gp_mean_model_(std::unique_ptr<imc_gp> gp_,
                       const arma::mat &row_cov_,
                       size_t predictor_idx_)
         : mn_mean_model_(arma::mat(), row_cov_, arma::mat()),
-          gp(std::move(gp_)), predictor_idx(predictor_idx_)
+          regression_base(predictor_idx_), gp(std::move(gp_))
     {
         set_row_cov(row_cov_);
     };
@@ -243,7 +241,7 @@ struct mn_gp_mean_model_ : public mn_mean_model_
     };
 
     // Setters
-    void set_hyperparameters(const double &alpha, const double &rho)
+    void set_hyperparameters(double alpha, double rho) override
     {
         gp->update_hyperparameters(alpha, rho);
         set_col_cov_prior();
@@ -267,6 +265,11 @@ struct mn_gp_mean_model_ : public mn_mean_model_
         col_cov_prior = gp->train_k_chol * gp->train_k_chol.t();
     };
 
+    arma::mat get_gp_predictions() override
+    {
+        return get_param();
+    };
+
     void set_data(const Dataset &data,
                   const arma::mat &data_mean_,
                   const arma::mat &data_cov_)
@@ -280,7 +283,7 @@ struct mn_gp_mean_model_ : public mn_mean_model_
     };
 };
 
-struct mn_hsgp_regression_model_ : public mn_regression_model_
+struct mn_hsgp_regression_model_ : public mn_regression_model_, public gp_base
 {
     std::unique_ptr<hsgp_approx> hsgp;
 
@@ -307,7 +310,7 @@ struct mn_hsgp_regression_model_ : public mn_regression_model_
         col_cov_posterior_chol.set_size(d_cols, d_cols);
     };
 
-    void set_hyperparameters(const double &alpha, const double &rho)
+    void set_hyperparameters(double alpha, double rho) override
     {
         hsgp->update_hyperparameters(alpha, rho);
         set_col_cov_prior();
@@ -316,6 +319,11 @@ struct mn_hsgp_regression_model_ : public mn_regression_model_
     void set_col_cov_prior()
     {
         mn_regression_model_::set_col_cov_prior(hsgp->scale());
+    };
+
+    arma::mat get_gp_predictions() override
+    {
+        return get_param() * *predictor;
     };
 
     void set_data(const Dataset &data,
@@ -329,6 +337,99 @@ struct mn_hsgp_regression_model_ : public mn_regression_model_
         // Data cov is currently fixed to be I
         mn_conjugate_base::set_data(data, data_mean_, data_cov_);
     };
+};
+
+struct mvn_covar_wrapper
+{
+    arma::mat *param_ptr = nullptr;
+
+    arma::uword d_pred;
+    arma::uword d_covariate;
+
+    arma::mat combined_data;
+    const arma::mat *predictor = nullptr;
+    const arma::mat *covariate = nullptr;
+
+    arma::mat joined_mat_const;
+    arma::mat predictor_mat_const;
+    arma::mat covar_mat_const;
+
+    arma::vec joined_prior_mean;
+    arma::vec predictor_prior_mean;
+    arma::vec covar_prior_mean;
+
+    arma::mat joined_prior_cov;
+    arma::mat predictor_prior_cov;
+    arma::mat covar_prior_cov;
+
+    mvn_covar_wrapper(
+        const arma::mat *predictor_,
+        const arma::mat *covariate_,
+        const arma::mat &predictor_mat_const_,
+        const arma::mat &covar_mat_const_,
+        const arma::vec &predictor_prior_mean_,
+        const arma::vec &covar_prior_mean_,
+        const arma::mat &predictor_prior_cov_,
+        const arma::mat &covar_prior_cov_)
+        : predictor(predictor_),
+          covariate(covariate_),
+          predictor_mat_const(predictor_mat_const_),
+          covar_mat_const(covar_mat_const_),
+          predictor_prior_mean(predictor_prior_mean_),
+          covar_prior_mean(covar_prior_mean_),
+          predictor_prior_cov(predictor_prior_cov_),
+          covar_prior_cov(covar_prior_cov_)
+    {
+        d_pred = predictor_mat_const.n_cols;
+        d_covariate = covar_mat_const.n_cols;
+
+        Rcpp::Rcout << predictor_mat_const << std::endl;
+        Rcpp::Rcout << covar_mat_const << std::endl;
+        Rcpp::Rcout << predictor_prior_mean << std::endl;
+        Rcpp::Rcout << covar_prior_mean << std::endl;
+        Rcpp::Rcout << predictor_prior_cov << std::endl;
+        Rcpp::Rcout << covar_prior_cov << std::endl;
+
+        joined_mat_const = join_rows(predictor_mat_const, covar_mat_const);
+        joined_prior_mean = join_cols(predictor_prior_mean, covar_prior_mean);
+        joined_prior_cov = diag_join(predictor_prior_cov, covar_prior_cov);
+    }
+
+    void set_data()
+    {
+        combined_data = join_cols(*predictor, *covariate);
+    }
+
+    void set_param_ptr(arma::mat *param_ptr_)
+    {
+        param_ptr = param_ptr_;
+    }
+
+    // Getters
+    const arma::mat &get_const() const
+    {
+        return joined_mat_const;
+    }
+
+    const arma::vec &get_mean() const
+    {
+        return joined_prior_mean;
+    }
+
+    const arma::mat &get_cov() const
+    {
+        return joined_prior_cov;
+    }
+
+    arma::mat get_pred_param()
+    {
+        return param_ptr->cols(0, d_pred - 1);
+    }
+
+    arma::mat get_covar_param()
+    {
+        return  param_ptr->cols(d_pred, d_pred + d_covariate - 1);
+    }
 };
 
 #endif

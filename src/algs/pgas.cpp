@@ -49,86 +49,24 @@ arma::mat transit_model(
     return out;
 }
 
+// PGAS markov kernel used in the gibbs sampler to sample state trajectories
 arma::mat pgas(
     const arma::mat &y,
     const arma::mat &covariate_dyn,
     const arma::mat &covariate_meas,
-    const uint &n_particles,
-    const uint &n_time,
-    const uint &d_lat,
-    gp_model_base &dyn_model,
-    normal_inverse_wishart_base &meas_model,
-    const arma::mat &x_prev,
-    const arma::vec &t0_mean,
-    const arma::mat &t0_cov)
-{
-    // Detect dynamic model type using RTTI (optional) or rely on virtual dispatch
-    if (auto *m = dynamic_cast<matniw_gp_model *>(&dyn_model))
-    {
-        // Call non-exact version
-        return pgas_markov(
-            y,
-            covariate_dyn,
-            covariate_meas,
-            n_particles,
-            n_time,
-            d_lat,
-            m->hsgp, // HSGP inside matniw_gp_model
-            x_prev,
-            t0_mean,
-            t0_cov,
-            m->des_int_mat,   // State transition matrix
-            m->des_covar_mat, // State covariate effect matrix
-            m->cov,           // Dynamic error
-            meas_model.des_int_mat,
-            meas_model.des_covar_mat,
-            meas_model.cov);
-    }
-    else if (auto *m = dynamic_cast<imc_iw *>(&dyn_model))
-    {
-        // Call exact version
-        return mpgas_markov(
-            y,
-            covariate_dyn,
-            covariate_meas,
-            n_particles,
-            n_time,
-            d_lat,
-            m->multiv_gp, // MH params
-            x_prev,
-            t0_mean,
-            t0_cov,
-            m->des_covar_mat, // State covariate effect
-            m->cov,           // Dynamic error
-            meas_model.des_int_mat,
-            meas_model.des_covar_mat,
-            meas_model.cov);
-    }
-    else
-    {
-        throw std::runtime_error("Unknown dynamic model type in simulate_latent_markov");
-    }
-}
-
-// PGAS markov kernel used in the gibbs sampler to sample state trajectories
-arma::mat pgas_markov(
-    const arma::mat &y,              // Observation matrix y
-    const arma::mat &covariate_dyn,  // Covariate data
-    const arma::mat &covariate_meas, // Covariate data
-    const int &n_particles,          // Number of particles
-    const int &n_time,               // Number of time-points
-    const int &d_lat,                // State dimensions
+    const int &n_particles,
+    const int &n_time,
+    const int &d_lat,
     hsgp_approx &hsgp,
-    const arma::mat &x_ref,      // Reference sample from last iteration
-    const arma::vec &t0_mean,    // Latent mean at t0
-    const arma::mat &t0_cov,     // Latent mean at t0
-    const arma::mat &trans_mat,  // State transition matrix
-    const arma::mat &lat_covar,  // State transition matrix
-    const arma::mat &dyn_cov,    // Dynamic error matrix
-    const arma::mat &des_mat,    // Design Matrix
-    const arma::mat &meas_covar, // State transition matrix
-    const arma::mat &meas_cov    // Measurement Error Matrix
-)
+    const arma::mat &x_ref,
+    const arma::vec &t0_mean,
+    const arma::mat &t0_cov,
+    const arma::mat &trans_mat,
+    const arma::mat &lat_covar,
+    const arma::mat &dyn_cov,
+    const arma::mat &des_mat,
+    const arma::mat &meas_covar,
+    const arma::mat &meas_cov)
 {
     // PGAS kernel from Lindsten et al. 2014 modified to assumo a Markovian
     // state progression as in Svenson et al. 2016.
@@ -304,23 +242,22 @@ arma::mat pgas_markov(
     return x_out;
 }
 
-arma::mat mpgas_markov(
-    const arma::mat &y, // Observation matrix y
+arma::mat pgas(
+    const arma::mat &y,
     const arma::mat &covariate_dyn,
-    const arma::mat &covariate_meas, // Covariate data
-    const int &n_particles,          // Number of particles
-    const int &n_time,               // Number of time-points
-    const int &d_lat,                // State dimensions
-    const imc_gp &gp_inp,
-    const arma::mat &x_ref,      // Reference sample from last iteration
-    const arma::vec &t0_mean,    // Latent mean at t0
-    const arma::mat &t0_cov,     // Latent mean at t0
-    const arma::mat &lat_covar,  // State transition matrix
-    const arma::mat &dyn_cov,    // Dynamic error matrix
-    const arma::mat &des_mat,    // Design Matrix
-    const arma::mat &meas_covar, // State transition matrix
-    const arma::mat &meas_cov    // Measurement Error Matrix
-)
+    const arma::mat &covariate_meas,
+    const int &n_particles,
+    const int &n_time,
+    const int &d_lat,
+    const imc_gp &gp,
+    const arma::mat &x_ref,
+    const arma::vec &t0_mean,
+    const arma::mat &t0_cov,
+    const arma::mat &lat_covar,
+    const arma::mat &dyn_cov,
+    const arma::mat &des_mat,
+    const arma::mat &meas_covar,
+    const arma::mat &meas_cov)
 {
     // PGAS kernel from Lindsten et al. 2014 modified
     int d_meas = y.n_rows;
@@ -395,7 +332,7 @@ arma::mat mpgas_markov(
 
     for (size_t i = 0; i < n_particles; i++)
     {
-        multi_output_gp[i].update_hyperparameters(gp_inp.alpha, gp_inp.rho);
+        multi_output_gp[i].update_hyperparameters(gp.alpha, gp.rho);
         multi_output_gp[i].update_sigma(dyn_cov);
 
         multi_output_gp[i].update_train_data(

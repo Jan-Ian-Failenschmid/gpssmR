@@ -8,63 +8,8 @@
 #include "sim_latent.h"
 #include "linear_algebra.h"
 
-arma::mat simulate_latent(std::unique_ptr<gp_model_base> &model_ptr,
-                          const arma::mat &covariate,
-                          const uint &n_time,
-                          const uint &d_lat,
-                          const arma::vec &t0_mean,
-                          const arma::mat &t0_cov)
-{
-    if (auto p = dynamic_cast<imc_iw *>(model_ptr.get()))
-        return sim_latent(*p, covariate, n_time, d_lat, t0_mean, t0_cov);
-    if (auto p = dynamic_cast<matniw_gp_model *>(model_ptr.get()))
-        return sim_latent(*p, covariate, n_time, d_lat, t0_mean, t0_cov);
-
-    throw std::runtime_error("Unknown GP model type for sim_latent");
-}
-
-arma::mat sim_latent(imc_iw &model,
-                     const arma::mat &covariate,
-                     const uint &n_time,
-                     const uint &d_lat,
-                     const arma::vec &t0_mean,
-                     const arma::mat &t0_cov)
-{
-    return sim_latent_exact(
-        covariate,
-        n_time,
-        d_lat,
-        std::exp(model.multiv_gp.alpha), // or model-specific hyperparameters
-        std::exp(model.multiv_gp.rho),
-        t0_mean,
-        t0_cov,
-        model.des_covar_mat, // State covariate effect matrix
-        model.cov            // Dynamic error matrix
-    );
-}
-
-arma::mat sim_latent(matniw_gp_model &model,
-                     const arma::mat &covariate,
-                     const uint &n_time,
-                     const uint &d_lat,
-                     const arma::vec &t0_mean,
-                     const arma::mat &t0_cov)
-{
-    return ::sim_latent_approx( // call your existing non-exact function
-        covariate,
-        n_time,
-        d_lat,
-        model.hsgp,
-        t0_mean,
-        t0_cov,
-        model.des_int_mat,   // State transition matrix
-        model.des_covar_mat, // State covariate effect matrix
-        model.cov            // Dynamic error matrix
-    );
-}
-
 // Simulate latent variable
-arma::mat sim_latent_approx(
+arma::mat sim_latent(
     const arma::mat &covariate, // Covariate data
     const uint &n_time,         // Number of time-points
     const uint &d_lat,          // State dimensions
@@ -89,8 +34,7 @@ arma::mat sim_latent_approx(
 
     for (size_t t = 1; t < n_time; t++)
     {
-        x.col(t) = trans_mat * 
-            hsgp.basis_functions(x.col(t - 1)) + 
+        x.col(t) = trans_mat * hsgp.basis_functions(x.col(t - 1)) + 
             lat_covar * covariate.col(t - 1);
         x.col(t) += dyn_cov_chol * arma::randn(d_lat,
                                                arma::distr_param(0.0, 1.0));
@@ -99,12 +43,11 @@ arma::mat sim_latent_approx(
     return x;
 };
 
-arma::mat sim_latent_exact(
+arma::mat sim_latent(
     const arma::mat &covariate,
     const uint &n_time,
     const uint &d_lat,
-    const double &alpha,
-    const double &rho,
+    const imc_gp &gp,
     const arma::vec &t0_mean, // Latent mean at t0
     const arma::mat &t0_cov,  // Latent mean at t0
     const arma::mat &lat_covar,
@@ -122,7 +65,7 @@ arma::mat sim_latent_exact(
                                     arma::randn(d_lat, arma::distr_param(0.0, 1.0));
 
     // Initialize GP without training and outcome data
-    multi_output_gp.update_hyperparameters(alpha, rho);
+    multi_output_gp.update_hyperparameters(gp.alpha, gp.rho);
     multi_output_gp.update_sigma(dyn_cov);
 
     multi_output_gp.update_train_data(
