@@ -5,6 +5,12 @@ is_psd_chol <- function(psd_matrix) {
   res <- tryCatch(chol(psd_matrix), error = function(e) NULL)
   return(!is.null(res))
 }
+vec2mat <- function(vector, mask) {
+  out <- mask
+  ind <- which(!is.finite(mask))
+  out[ind] <- vector
+  out
+}
 add_error <- function(msg) {
   errors <<- c(errors, msg)
 }
@@ -436,7 +442,7 @@ gpssm <- R6::R6Class("gpssm",
               self$data$get_latent_name_vec(),
               self$gp_name_vec,
               self$hyperparameter_names,
-              self$dyn_design_mat$get_par_names(),
+              if (!exact) self$dyn_design_mat$get_par_names(),
               self$dyn_covariate_mat$get_par_names(),
               self$dyn_cov_mat$get_par_names(),
               self$meas_design_mat$get_par_names(),
@@ -497,7 +503,7 @@ gpssm <- R6::R6Class("gpssm",
               self$data$get_latent_name_vec(),
               self$gp_name_vec,
               self$hyperparameter_names,
-              self$dyn_design_mat$get_par_names(),
+              if (!exact) self$dyn_design_mat$get_par_names(),
               self$dyn_covariate_mat$get_par_names(),
               self$dyn_cov_mat$get_par_names(),
               self$meas_design_mat$get_par_names(),

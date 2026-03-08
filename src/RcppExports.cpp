@@ -64,11 +64,57 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// gpssm_prior_sample
+arma::mat gpssm_prior_sample(const uint& n_iter, const int& n_time, const int& d_lat, const int& d_obs, const arma::mat& covariate_dyn, const arma::mat& covariate_meas, const arma::vec& t0_mean, const arma::mat& t0_cov, const arma::mat& basis_fun_index, const arma::vec& boundry_factor, const Rcpp::Function& rprior, const arma::mat dyn_design_mat_const, const arma::mat dyn_design_mat_mean, const arma::mat dyn_covar_mat_const, const arma::mat dyn_covar_mat_mean, const arma::mat dyn_covar_mat_col_cov, const uint& dyn_cov_df, const arma::mat& dyn_cov_scale, const arma::mat meas_design_mat_const, const arma::mat meas_design_mat_mean, const arma::mat meas_design_mat_col_cov, const arma::vec meas_design_mat_mean_alt, const arma::mat meas_design_mat_cov_alt, const arma::mat meas_covar_mat_const, const arma::mat meas_covar_mat_mean, const arma::mat meas_covar_mat_col_cov, const arma::vec meas_covar_mat_mean_alt, const arma::mat meas_covar_mat_cov_alt, const uint& meas_cov_df, const arma::mat& meas_cov_scale, const bool uses_alt, const arma::mat& y, bool exact, bool pred, bool disp_prog);
+RcppExport SEXP _gpssmR_gpssm_prior_sample(SEXP n_iterSEXP, SEXP n_timeSEXP, SEXP d_latSEXP, SEXP d_obsSEXP, SEXP covariate_dynSEXP, SEXP covariate_measSEXP, SEXP t0_meanSEXP, SEXP t0_covSEXP, SEXP basis_fun_indexSEXP, SEXP boundry_factorSEXP, SEXP rpriorSEXP, SEXP dyn_design_mat_constSEXP, SEXP dyn_design_mat_meanSEXP, SEXP dyn_covar_mat_constSEXP, SEXP dyn_covar_mat_meanSEXP, SEXP dyn_covar_mat_col_covSEXP, SEXP dyn_cov_dfSEXP, SEXP dyn_cov_scaleSEXP, SEXP meas_design_mat_constSEXP, SEXP meas_design_mat_meanSEXP, SEXP meas_design_mat_col_covSEXP, SEXP meas_design_mat_mean_altSEXP, SEXP meas_design_mat_cov_altSEXP, SEXP meas_covar_mat_constSEXP, SEXP meas_covar_mat_meanSEXP, SEXP meas_covar_mat_col_covSEXP, SEXP meas_covar_mat_mean_altSEXP, SEXP meas_covar_mat_cov_altSEXP, SEXP meas_cov_dfSEXP, SEXP meas_cov_scaleSEXP, SEXP uses_altSEXP, SEXP ySEXP, SEXP exactSEXP, SEXP predSEXP, SEXP disp_progSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const uint& >::type n_iter(n_iterSEXP);
+    Rcpp::traits::input_parameter< const int& >::type n_time(n_timeSEXP);
+    Rcpp::traits::input_parameter< const int& >::type d_lat(d_latSEXP);
+    Rcpp::traits::input_parameter< const int& >::type d_obs(d_obsSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type covariate_dyn(covariate_dynSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type covariate_meas(covariate_measSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type t0_mean(t0_meanSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type t0_cov(t0_covSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type basis_fun_index(basis_fun_indexSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type boundry_factor(boundry_factorSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::Function& >::type rprior(rpriorSEXP);
+    Rcpp::traits::input_parameter< const arma::mat >::type dyn_design_mat_const(dyn_design_mat_constSEXP);
+    Rcpp::traits::input_parameter< const arma::mat >::type dyn_design_mat_mean(dyn_design_mat_meanSEXP);
+    Rcpp::traits::input_parameter< const arma::mat >::type dyn_covar_mat_const(dyn_covar_mat_constSEXP);
+    Rcpp::traits::input_parameter< const arma::mat >::type dyn_covar_mat_mean(dyn_covar_mat_meanSEXP);
+    Rcpp::traits::input_parameter< const arma::mat >::type dyn_covar_mat_col_cov(dyn_covar_mat_col_covSEXP);
+    Rcpp::traits::input_parameter< const uint& >::type dyn_cov_df(dyn_cov_dfSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type dyn_cov_scale(dyn_cov_scaleSEXP);
+    Rcpp::traits::input_parameter< const arma::mat >::type meas_design_mat_const(meas_design_mat_constSEXP);
+    Rcpp::traits::input_parameter< const arma::mat >::type meas_design_mat_mean(meas_design_mat_meanSEXP);
+    Rcpp::traits::input_parameter< const arma::mat >::type meas_design_mat_col_cov(meas_design_mat_col_covSEXP);
+    Rcpp::traits::input_parameter< const arma::vec >::type meas_design_mat_mean_alt(meas_design_mat_mean_altSEXP);
+    Rcpp::traits::input_parameter< const arma::mat >::type meas_design_mat_cov_alt(meas_design_mat_cov_altSEXP);
+    Rcpp::traits::input_parameter< const arma::mat >::type meas_covar_mat_const(meas_covar_mat_constSEXP);
+    Rcpp::traits::input_parameter< const arma::mat >::type meas_covar_mat_mean(meas_covar_mat_meanSEXP);
+    Rcpp::traits::input_parameter< const arma::mat >::type meas_covar_mat_col_cov(meas_covar_mat_col_covSEXP);
+    Rcpp::traits::input_parameter< const arma::vec >::type meas_covar_mat_mean_alt(meas_covar_mat_mean_altSEXP);
+    Rcpp::traits::input_parameter< const arma::mat >::type meas_covar_mat_cov_alt(meas_covar_mat_cov_altSEXP);
+    Rcpp::traits::input_parameter< const uint& >::type meas_cov_df(meas_cov_dfSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type meas_cov_scale(meas_cov_scaleSEXP);
+    Rcpp::traits::input_parameter< const bool >::type uses_alt(uses_altSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type y(ySEXP);
+    Rcpp::traits::input_parameter< bool >::type exact(exactSEXP);
+    Rcpp::traits::input_parameter< bool >::type pred(predSEXP);
+    Rcpp::traits::input_parameter< bool >::type disp_prog(disp_progSEXP);
+    rcpp_result_gen = Rcpp::wrap(gpssm_prior_sample(n_iter, n_time, d_lat, d_obs, covariate_dyn, covariate_meas, t0_mean, t0_cov, basis_fun_index, boundry_factor, rprior, dyn_design_mat_const, dyn_design_mat_mean, dyn_covar_mat_const, dyn_covar_mat_mean, dyn_covar_mat_col_cov, dyn_cov_df, dyn_cov_scale, meas_design_mat_const, meas_design_mat_mean, meas_design_mat_col_cov, meas_design_mat_mean_alt, meas_design_mat_cov_alt, meas_covar_mat_const, meas_covar_mat_mean, meas_covar_mat_col_cov, meas_covar_mat_mean_alt, meas_covar_mat_cov_alt, meas_cov_df, meas_cov_scale, uses_alt, y, exact, pred, disp_prog));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 RcppExport SEXP run_testthat_tests(SEXP);
 
 static const R_CallMethodDef CallEntries[] = {
     {"_gpssmR_gpssm_sample", (DL_FUNC) &_gpssmR_gpssm_sample, 43},
+    {"_gpssmR_gpssm_prior_sample", (DL_FUNC) &_gpssmR_gpssm_prior_sample, 35},
     {"run_testthat_tests", (DL_FUNC) &run_testthat_tests, 1},
     {NULL, NULL, 0}
 };

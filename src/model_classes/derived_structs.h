@@ -383,16 +383,16 @@ struct mvn_covar_wrapper
         d_pred = predictor_mat_const.n_cols;
         d_covariate = covar_mat_const.n_cols;
 
-        Rcpp::Rcout << predictor_mat_const << std::endl;
-        Rcpp::Rcout << covar_mat_const << std::endl;
-        Rcpp::Rcout << predictor_prior_mean << std::endl;
-        Rcpp::Rcout << covar_prior_mean << std::endl;
-        Rcpp::Rcout << predictor_prior_cov << std::endl;
-        Rcpp::Rcout << covar_prior_cov << std::endl;
-
         joined_mat_const = join_rows(predictor_mat_const, covar_mat_const);
         joined_prior_mean = join_cols(predictor_prior_mean, covar_prior_mean);
-        joined_prior_cov = diag_join(predictor_prior_cov, covar_prior_cov);
+        if (d_covariate == 0)
+        {
+            joined_prior_cov = predictor_prior_cov;
+        }
+        else
+        {
+            joined_prior_cov = diag_join(predictor_prior_cov, covar_prior_cov);
+        }
     }
 
     void set_data()
@@ -428,7 +428,10 @@ struct mvn_covar_wrapper
 
     arma::mat get_covar_param()
     {
-        return  param_ptr->cols(d_pred, d_pred + d_covariate - 1);
+        if (d_covariate == 0)
+            return arma::mat(param_ptr->n_rows, 0); // empty matrix
+
+        return param_ptr->cols(d_pred, d_pred + d_covariate - 1);
     }
 };
 
