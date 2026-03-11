@@ -6,6 +6,8 @@
 #include "base_structs.h"
 #include "imc_gp_class.h"
 #include "hsgp_class.h"
+#include <rcpptimer.h>
+#include "timer.h"
 
 struct mn_iw_model_ : public model_base
 {
@@ -51,10 +53,14 @@ struct mn_iw_model_ : public model_base
                   const arma::mat &data_cov_)
     {
         // Doing anything or am I just copying matrices for fun?
-        // model_base::set_data(data, data_mean_, data_cov_);
+        // model_base::set_daeta(data, data_mean_, data_cov_);
+        timer.tic("mh.set_data.mnmn");
         mn->set_data(data, data_mean_, data_cov_);
+        timer.toc("mh.set_data.mnmn");
+        timer.tic("mh.set_data.iw");
         iw->set_data(data, mn->get_marginal_mean(),
                      mn->get_marginal_cov());
+        timer.toc("mh.set_data.iw");
     };
 
     // Getters
@@ -108,9 +114,13 @@ struct mn_mn_model_ : public mn_conjugate_base
                   const arma::mat &data_mean_,
                   const arma::mat &data_cov_)
     {
+        timer.tic("mh.set_data.mn1Test");
         mn1->set_data(data, data_mean_, data_cov_);
+        timer.toc("mh.set_data.mn1Test");
+        timer.tic("mh.set_data.mn2");
         mn2->set_data(data, mn1->get_marginal_mean(),
                       mn1->get_marginal_cov());
+        timer.toc("mh.set_data.mn2");
     };
 
     void set_row_cov(const arma::mat &row_cov_) override
@@ -339,81 +349,51 @@ struct mn_hsgp_regression_model_ : public mn_regression_model_, public gp_base
     };
 };
 
-struct mvn_covar_wrapper
+struct model_wrapper_base
 {
     arma::mat *param_ptr = nullptr;
-
-    arma::uword d_pred;
-    arma::uword d_covariate;
 
     arma::mat combined_data;
     const arma::mat *predictor = nullptr;
     const arma::mat *covariate = nullptr;
 
-    arma::mat joined_mat_const;
-    arma::mat predictor_mat_const;
-    arma::mat covar_mat_const;
-
-    arma::vec joined_prior_mean;
-    arma::vec predictor_prior_mean;
-    arma::vec covar_prior_mean;
+    arma::uword d_pred;
+    arma::uword d_covariate;
 
     arma::mat joined_prior_cov;
     arma::mat predictor_prior_cov;
     arma::mat covar_prior_cov;
 
-    mvn_covar_wrapper(
+    model_wrapper_base(
         const arma::mat *predictor_,
         const arma::mat *covariate_,
-        const arma::mat &predictor_mat_const_,
-        const arma::mat &covar_mat_const_,
-        const arma::vec &predictor_prior_mean_,
-        const arma::vec &covar_prior_mean_,
         const arma::mat &predictor_prior_cov_,
         const arma::mat &covar_prior_cov_)
         : predictor(predictor_),
           covariate(covariate_),
-          predictor_mat_const(predictor_mat_const_),
-          covar_mat_const(covar_mat_const_),
-          predictor_prior_mean(predictor_prior_mean_),
-          covar_prior_mean(covar_prior_mean_),
           predictor_prior_cov(predictor_prior_cov_),
           covar_prior_cov(covar_prior_cov_)
     {
-        d_pred = predictor_mat_const.n_cols;
-        d_covariate = covar_mat_const.n_cols;
+        d_pred = predictor_->n_rows;
+        d_covariate = covariate_ ? covariate_->n_rows : 0;
 
-        joined_mat_const = join_rows(predictor_mat_const, covar_mat_const);
-        joined_prior_mean = join_cols(predictor_prior_mean, covar_prior_mean);
         if (d_covariate == 0)
-        {
             joined_prior_cov = predictor_prior_cov;
-        }
         else
-        {
-            joined_prior_cov = diag_join(predictor_prior_cov, covar_prior_cov);
-        }
+            joined_prior_cov =
+                diag_join(predictor_prior_cov, covar_prior_cov);
+
+        set_data();
     }
 
     void set_data()
     {
-        combined_data = join_cols(*predictor, *covariate);
+        combined_data = arma::join_cols(*predictor, *covariate);
     }
 
     void set_param_ptr(arma::mat *param_ptr_)
     {
         param_ptr = param_ptr_;
-    }
-
-    // Getters
-    const arma::mat &get_const() const
-    {
-        return joined_mat_const;
-    }
-
-    const arma::vec &get_mean() const
-    {
-        return joined_prior_mean;
     }
 
     const arma::mat &get_cov() const
@@ -429,9 +409,91 @@ struct mvn_covar_wrapper
     arma::mat get_covar_param()
     {
         if (d_covariate == 0)
-            return arma::mat(param_ptr->n_rows, 0); // empty matrix
+            return arma::mat(param_ptr->n_rows, 0);
 
         return param_ptr->cols(d_pred, d_pred + d_covariate - 1);
+    }
+};
+
+struct mvn_covar_wrapper : public model_wrapper_base
+{
+    arma::mat joined_mat_const;
+    arma::mat predictor_mat_const;
+    arma::mat covar_mat_const;
+
+    arma::vec joined_prior_mean;
+    arma::vec predictor_prior_mean;
+    arma::vec covar_prior_mean;
+
+    mvn_covar_wrapper(
+        const arma::mat *predictor_,
+        const arma::mat *covariate_,
+        const arma::mat &predictor_mat_const_,
+        const arma::mat &covar_mat_const_,
+        const arma::vec &predictor_prior_mean_,
+        const arma::vec &covar_prior_mean_,
+        const arma::mat &predictor_prior_cov_,
+        const arma::mat &covar_prior_cov_)
+        : model_wrapper_base(
+              predictor_,
+              covariate_,
+              predictor_prior_cov_,
+              covar_prior_cov_),
+          predictor_mat_const(predictor_mat_const_),
+          covar_mat_const(covar_mat_const_),
+          predictor_prior_mean(predictor_prior_mean_),
+          covar_prior_mean(covar_prior_mean_)
+    {
+        joined_mat_const =
+            arma::join_rows(predictor_mat_const, covar_mat_const);
+
+        joined_prior_mean =
+            arma::join_cols(predictor_prior_mean, covar_prior_mean);
+    }
+
+    const arma::mat &get_const() const
+    {
+        return joined_mat_const;
+    }
+
+    const arma::vec &get_mean() const
+    {
+        return joined_prior_mean;
+    }
+};
+
+struct mn_covar_wrapper : public model_wrapper_base
+{
+    arma::mat joined_mat_const;
+    arma::mat predictor_mat_const;
+    arma::mat covar_mat_const;
+
+    arma::mat joined_prior_mean;
+    arma::mat predictor_prior_mean;
+    arma::mat covar_prior_mean;
+
+    mn_covar_wrapper(
+        const arma::mat *predictor_,
+        const arma::mat *covariate_,
+        const arma::mat &predictor_prior_mean_,
+        const arma::mat &covar_prior_mean_,
+        const arma::mat &predictor_prior_cov_,
+        const arma::mat &covar_prior_cov_)
+        : model_wrapper_base(
+              predictor_,
+              covariate_,
+              predictor_prior_cov_,
+              covar_prior_cov_),
+          predictor_prior_mean(predictor_prior_mean_),
+          covar_prior_mean(covar_prior_mean_)
+    {
+        joined_prior_mean =
+            arma::join_rows(predictor_prior_mean, covar_prior_mean);
+    }
+
+    const arma::mat &get_mean() const
+    {
+        return joined_prior_mean;
     }
 };
 

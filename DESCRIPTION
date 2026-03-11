@@ -18,7 +18,8 @@ LinkingTo:
     Rcpp,
     RcppArmadillo,
     RcppProgress,
-    testthat
+    testthat,  
+    rcpptimer (>= 1.2.0)
 Suggests: 
     future,
     xml2
