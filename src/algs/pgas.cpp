@@ -57,7 +57,7 @@ arma::mat pgas(
     const int &n_particles,
     const int &n_time,
     const int &d_lat,
-    hsgp_approx &hsgp,
+    const hsgp_approx &hsgp,
     const arma::mat &x_ref,
     const arma::vec &t0_mean,
     const arma::mat &t0_cov,
@@ -70,7 +70,7 @@ arma::mat pgas(
 {
     // PGAS kernel from Lindsten et al. 2014 modified to assumo a Markovian
     // state progression as in Svenson et al. 2016.
-
+    hsgp_approx hsgp_local = hsgp;
     // Initialize a cube to hold the particle values over all particles N
     // the state dimensions D and the time-points T
     arma::cube x(d_lat, n_particles, n_time);
@@ -160,7 +160,7 @@ arma::mat pgas(
             // Precalculate predictions of all previous particle states and store in
             // x_pred for later use
             x_pred = transit_model(
-                hsgp.basis_functions(x.slice(t - 1)),
+                hsgp_local.basis_functions(x.slice(t - 1)),
                 covariate_dyn.col(t - 1), trans_mat, lat_covar);
 
             // Resample predictions according to ancestor indices

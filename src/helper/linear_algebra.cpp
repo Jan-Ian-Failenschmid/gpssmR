@@ -69,8 +69,7 @@ void make_symmetric(arma::mat &X)
 };
 
 // Stabailized matrix inverse and cholesky
-void stabalized_inv_chol(arma::mat &cov, arma::mat &cov_chol,
-                         arma::mat &cov_inv, const arma::mat &cov_)
+void stabalized_inv(arma::mat &cov, arma::mat &cov_inv, const arma::mat &cov_)
 {
     try
     {
@@ -84,14 +83,12 @@ void stabalized_inv_chol(arma::mat &cov, arma::mat &cov_chol,
 
             // Invert back
             cov = arma::diagmat(1.0 / inv_d);
-            cov_chol = arma::diagmat(arma::sqrt(cov.diag()));
             cov_inv = arma::diagmat(inv_d);
         }
         else
         {
             cov = cov_;
             cov_inv = arma::inv_sympd(cov);
-            cov_chol = arma::chol(cov, "lower");
         }
     }
     catch (const std::exception &e)
@@ -100,6 +97,11 @@ void stabalized_inv_chol(arma::mat &cov, arma::mat &cov_chol,
                     << e.what() << std::endl;
     }
 }
+
+// Construct covariance matrix from cholesky pointer
+void construct_cov(arma::mat &cov, const arma::mat &cov_chol) {
+    cov = cov_chol * cov_chol.t();
+};
 
 arma::mat identity(arma::uword n)
 {

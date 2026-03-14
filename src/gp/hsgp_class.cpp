@@ -45,6 +45,33 @@ arma::mat hsgp_approx::basis_functions(const arma::mat &x)
     return phi;
 }
 
+arma::mat *hsgp_approx::get_predictor_ptr()
+{
+    return &phi;
+}
+
+arma::mat *hsgp_approx::get_cov_chol_ptr()
+{
+    return &scale_chol;
+}
+
+void hsgp_approx::set_chol()
+{
+    // Calculate inverse spdf
+    arma::vec inv_spdf = 1.0 / spdf;
+
+    // Adjustment for numerical stability
+    for (size_t i = 0; i < inv_spdf.n_elem; i++)
+    {
+        if (std::isinf(inv_spdf(i)))
+        {
+            inv_spdf(i) = std::numeric_limits<double>::max();
+        }
+    }
+
+    scale_chol = arma::sqrt(arma::diagmat(1.0 / inv_spdf));
+}
+
 arma::mat hsgp_approx::inv_scale()
 {
     // Calculate inverse spdf

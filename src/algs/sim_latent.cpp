@@ -13,7 +13,7 @@ arma::mat sim_latent(
     const arma::mat &covariate, // Covariate data
     const uint &n_time,         // Number of time-points
     const uint &d_lat,          // State dimensions
-    hsgp_approx &hsgp,
+    const hsgp_approx &hsgp,
     const arma::vec &t0_mean,   // Latent mean at t0
     const arma::mat &t0_cov,    // Latent mean at t0
     const arma::mat &trans_mat, // State transition matrix
@@ -21,6 +21,8 @@ arma::mat sim_latent(
     const arma::mat &dyn_cov    // Dynamic error matrix
 )
 {
+    hsgp_approx hsgp_local = hsgp;
+    
     // Initialize latent variable matrix
     arma::mat x(d_lat, n_time);
 
@@ -34,8 +36,8 @@ arma::mat sim_latent(
 
     for (size_t t = 1; t < n_time; t++)
     {
-        x.col(t) = trans_mat * hsgp.basis_functions(x.col(t - 1)) + 
-            lat_covar * covariate.col(t - 1);
+        x.col(t) = trans_mat * hsgp_local.basis_functions(x.col(t - 1)) +
+                   lat_covar * covariate.col(t - 1);
         x.col(t) += dyn_cov_chol * arma::randn(d_lat,
                                                arma::distr_param(0.0, 1.0));
     }
@@ -95,8 +97,6 @@ arma::mat sim_latent(
     // Return all objects in a list
     return x_sample;
 };
-
-
 
 arma::mat simulate_latent(std::unique_ptr<gp_model_base> &model_ptr,
                           const arma::mat &covariate,
@@ -179,9 +179,9 @@ arma::mat sim_latent_approx(
 
     for (size_t t = 1; t < n_time; t++)
     {
-        x.col(t) = trans_mat * 
-            hsgp.basis_functions(x.col(t - 1)) + 
-            lat_covar * covariate.col(t - 1);
+        x.col(t) = trans_mat *
+                       hsgp.basis_functions(x.col(t - 1)) +
+                   lat_covar * covariate.col(t - 1);
         x.col(t) += dyn_cov_chol * arma::randn(d_lat,
                                                arma::distr_param(0.0, 1.0));
     }

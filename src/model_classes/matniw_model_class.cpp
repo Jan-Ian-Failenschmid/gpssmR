@@ -130,8 +130,10 @@ void matniw_model::update_col_cov(
                                   des_covar_mat_col_cov);
     }
 
-    stabalized_inv_chol(prior_col_cov, prior_col_cov_chol, prior_precision,
-                        prior_col_cov);
+    stabalized_inv(prior_col_cov, prior_precision,
+                   prior_col_cov);
+
+    prior_col_cov_chol = chol(prior_col_cov, "lower");
 }
 
 void matniw_model::sample_prior()
@@ -177,7 +179,6 @@ void matniw_model::calc_posterior_parameters()
     // 1 to T - 1 and z from 0 to T-2 in zero indexing in Svenson but not in
     // Wills)
     // Also EQ 38 b & c in Wills et al. 2012
-
     phi = outcome * outcome.t();
     psi = outcome * predictor.t();
     sigma = predictor * predictor.t();

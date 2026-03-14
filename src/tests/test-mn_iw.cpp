@@ -5,6 +5,7 @@
 #include "t_helper.h"
 #include "linear_algebra.h"
 #include "matniw_model_class.h"
+#include "initializers.h"
 #include "base_structs.h"
 #include "derived_structs.h"
 
@@ -42,11 +43,12 @@ context("C++ Matrix-normal-inverse-Wishart")
         Y = chol(cov, "lower") * Y;
         Y += tans_mat * X;
 
-        Dataset data;
-        data.outcome = &Y;
-        data.predictors = {&X, &covariate};
+        // Dataset data;
+        // data.outcome = &Y;
+        // d ata.predictors = {&X, &covariate};
 
         // Computation
+        // Old model
         matniw_model mn_iw_model1(tans_mat_const, covar_mat_const, tans_mat_mean, covar_mat_mean, col_cov, covar_col_cov, cov_df,
                                   cov_scale);
 
@@ -56,15 +58,42 @@ context("C++ Matrix-normal-inverse-Wishart")
         set_r_seed(2);
         mn_iw_model1.sample_joint_posterior();
 
-        auto mn = std::make_unique<mn_regression_model_>(
-            tans_mat_mean, col_cov, identity(d), 0);
+        // New model
+        arma::mat col_cov_chol = chol(col_cov, "lower");
+        arma::mat covar_col_cov_chol = chol(covar_col_cov, "lower");
+        arma::mat cov_scale_chol = chol(cov_scale, "lower");
+        arma::mat data_mean(d, n, arma::fill::zeros);
+        arma::mat data_cov = identity(n);
 
-        auto iw = std::make_unique<iw_model_>(cov_df, cov_scale);
+        mn_covar_wrapper model_wrapper(
+            &X, &covariate,
+            &tans_mat_mean, &covar_mat_mean,
+            &col_cov_chol, &covar_col_cov_chol);
 
-        mn_iw_model_ mn_iw_modeld(std::move(mn), std::move(iw));
+        mn_iw_model_ mn_iw_modeld = init_mn_iw_model(
+            Y,
+            data_mean,
+            data_cov,
+            model_wrapper,
+            cov_scale_chol,
+            cov_df);
 
-        mn_iw_modeld.set_data(data, arma::mat(d, n, arma::fill::zeros),
-                              identity(n));
+        // auto iw = std::make_unique<iw_model_>(cov_df, &cov_scale_chol);
+
+        // auto mn = std::make_unique<mn_regression_model>(
+        //     model_wrapper.get_mean_ptr(),
+        //     model_wrapper.get_prior_cov_chol_ptr(),
+        //     iw->get_cov_chol_ptr());
+        // mn->set_predictor(model_wrapper.get_data_ptr());
+        // model_wrapper.set_param_ptr(mn->get_coefficient_ptr());
+
+        // mn_iw_model_ mn_iw_modeld(std::move(mn), std::move(iw));
+        // mn_iw_modeld.set_outcome(&Y);
+
+        // mn_iw_modeld.set_likelihood_pars(&data_mean, &data_cov);
+        // mn_iw_modeld.mn->calc_marginal_parameters();
+        // mn_iw_modeld.set_data(data, arma::mat(d, n, arma::fill::zeros),
+        //                       identity(n));
         mn_iw_modeld.calc_posterior_parameters();
         set_r_seed(2);
         mn_iw_modeld.sample_posterior();
@@ -72,17 +101,17 @@ context("C++ Matrix-normal-inverse-Wishart")
         // Expectation
         // Posterior means
         Rcpp::Rcerr.precision(15);
+        // Rcpp::Rcerr << "\nPosterior Mean" << std::endl;
         // mn_iw_modeld.mn->param_posterior.raw_print(Rcpp::Rcerr);
         // mn_iw_model1.post_des_mat_mean.raw_print(Rcpp::Rcerr);
-
         arma::mat posterior_mean = {
             {0.314975546604197, -0.0291691334747645},
             {-0.0702684735339689, -1.59732729056066}};
-        expect_true(
-            compare_mat(mn_iw_modeld.mn->param_posterior,
-                        posterior_mean, 1e-10));
+        expect_true(compare_mat(mn_iw_modeld.mn->coefficient_posterior,
+                                posterior_mean, 1e-10));
 
         // Posterior column covariance
+        // Rcpp::Rcerr << "\nPosterior Column Covariance" << std::endl;
         // mn_iw_modeld.mn->col_cov_posterior.raw_print(Rcpp::Rcerr);
         // mn_iw_model1.post_col_cov.raw_print(Rcpp::Rcerr);
         arma::mat posterior_col_cov = {
@@ -94,6 +123,7 @@ context("C++ Matrix-normal-inverse-Wishart")
                         posterior_col_cov, 1e-10));
 
         // Posterior covariance scale
+        // Rcpp::Rcerr << "\nPosterior Cov Scale" << std::endl;
         // mn_iw_modeld.iw->cov_scale_posterior.raw_print(Rcpp::Rcerr);
         // mn_iw_model1.post_cov_scale.raw_print(Rcpp::Rcerr);
         arma::mat posterior_cov_scale = {
@@ -105,17 +135,19 @@ context("C++ Matrix-normal-inverse-Wishart")
                         posterior_cov_scale, 1e-10));
 
         // Posterior parameter sample
-        // mn_iw_modeld.mn->get_param().raw_print(Rcpp::Rcerr);
+        // Rcpp::Rcerr << "\nPosterior Coef Sample" << std::endl;
+        // model_wrapper.get_pred_param().raw_print(Rcpp::Rcerr);
         // mn_iw_model1.des_mat.raw_print(Rcpp::Rcerr);
         arma::mat posterior_param_sample = {
             {0.52023808822878, 0.24116544073709},
             {-0.119311456861801, -1.37475988508342}};
 
         expect_true(
-            compare_mat(mn_iw_modeld.mn->get_param(),
+            compare_mat(model_wrapper.get_pred_param(),
                         posterior_param_sample, 1e-10));
 
         // Posterior covariance sample
+        // Rcpp::Rcerr << "\nPosterior Cov Sample" << std::endl;
         // mn_iw_modeld.iw->get_cov().raw_print(Rcpp::Rcerr);
         // mn_iw_model1.cov.raw_print(Rcpp::Rcerr);
         arma::mat posterior_cov_sample = {

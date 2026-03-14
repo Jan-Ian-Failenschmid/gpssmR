@@ -14,7 +14,7 @@ arma::mat sim_latent(
     const arma::mat &covariate, // Covariate data
     const uint &n_time,         // Number of time-points
     const uint &d_lat,          // State dimensions
-    hsgp_approx &hsgp,
+    const hsgp_approx &hsgp,
     const arma::vec &t0_mean,   // Latent mean at t0
     const arma::mat &t0_cov,    // Latent mean at t0
     const arma::mat &trans_mat, // State transition matrix

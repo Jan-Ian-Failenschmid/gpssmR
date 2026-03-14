@@ -68,7 +68,7 @@ arma::mat pgas(
     const int &n_particles,
     const int &n_time,
     const int &d_lat,
-    hsgp_approx &hsgp,
+    const hsgp_approx &hsgp,
     const arma::mat &x_ref,
     const arma::vec &t0_mean,
     const arma::mat &t0_cov,

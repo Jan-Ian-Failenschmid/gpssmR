@@ -2,14 +2,16 @@
 #define IMC_GP_CLASS_H
 
 // [[Rcpp::depends(RcppArmadillo)]]
+#include "base_structs.h"
 
-struct imc_gp
+struct imc_gp : public gp_base
 {
     uint dim_inp; // Input dimension
     uint dim_out; // Output dimension
 
     arma::mat train_dat; // (dim_inp × n_train)
     uint n_training;
+    arma::mat predictor_proxy;
 
     arma::mat test_dat; // (dim_inp × n_test)
     uint n_test;
@@ -76,6 +78,33 @@ struct imc_gp
                            const arma::mat &y_lower_diag);
     void append_test_y_cov_I();
     void reset_test_y_cov();
+
+    // Virtual functions
+    void set_hyperparameters(double alpha, double rho) override
+    {
+        update_hyperparameters(alpha, rho);
+    };
+
+    void update_predictor(const arma::mat &predictor) override
+    {
+        update_train_data(predictor, outcome_dat);
+        predictor_proxy = identity(n_training);
+    };
+
+    arma::mat *get_cov_chol_ptr() override
+    {
+        return &train_k_chol;
+    };
+
+    arma::mat *get_predictor_ptr() override
+    {
+        return &predictor_proxy;
+    };
+
+    arma::mat get_gp_predictions() override
+    {
+        return arma::mat(0, 0);
+    }
 };
 
 #endif

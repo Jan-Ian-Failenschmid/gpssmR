@@ -20,9 +20,11 @@ arma::mat expand_grid_2d(const arma::vec &a, const arma::vec &b);
 // Jitter matrix
 void jitter_mat(arma::mat &K, double delta);
 
-// Stabailized matrix inverse and cholesky
-void stabalized_inv_chol(arma::mat &cov, arma::mat &cov_chol,
-                         arma::mat &cov_inv, const arma::mat &cov_);
+// Stabailized matrix inverse
+void stabalized_inv(arma::mat &cov, arma::mat &cov_inv, const arma::mat &cov_);
+
+// Construct covariance matrix from cholesky pointer
+void construct_cov(arma::mat &cov, const arma::mat &cov_chol_ptr);
 
 // Identity matrix
 arma::mat identity(arma::uword n);
