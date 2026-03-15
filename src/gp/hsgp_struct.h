@@ -1,7 +1,7 @@
 #ifndef HSGP_STRUCT_H
 #define HSGP_STRUCT_H
 
-// [[Rcpp::depends(RcppArmadillo)]]
+#include "base_structs.h"
 
 // Hsgp approximation struct
 struct hsgp_approx : public gp_base

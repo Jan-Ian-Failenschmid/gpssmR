@@ -1,20 +1,3 @@
-is_psd_chol <- function(psd_matrix) {
-  if (!isSymmetric(psd_matrix)) {
-    return(FALSE)
-  }
-  res <- tryCatch(chol(psd_matrix), error = function(e) NULL)
-  return(!is.null(res))
-}
-vec2mat <- function(vector, mask) {
-  out <- mask
-  ind <- which(!is.finite(mask))
-  out[ind] <- vector
-  out
-}
-add_error <- function(msg) {
-  errors <<- c(errors, msg)
-}
-
 ### Define classes, generics and methods ---------------------------------------
 # Design matrix ----------------------------------------------------------------
 gpssm_design_mat <- R6::R6Class("gpssm_design_mat",
@@ -689,186 +672,186 @@ gpssm <- R6::R6Class("gpssm",
       self$posterior_samples <- sample_draws[(warm_up + 1):(iter + warm_up), , ]
 
       return(invisible(self))
+    },
+    plot_pred = function(prior = FALSE, 
+    latent_smooth = FALSE, ci = 0.95, true_latent = FALSE) {
+
+      require(ggplot2)
+      require(posterior)
+
+      n_indicators <- self$data$get_d_obs()
+      data_name <- self$data$data_name
+      latent_name <- self$data$latent_name
+      n_time <- self$data$get_time()
+      alpha <- (1 - ci) / 2
+      time_index <- seq_len(n_time)
+
+      ## Access samples without coppying 
+      get_samples <- if (prior) {
+        function() self$prior_samples
+      } else {
+        function() self$posterior_samples
+      }
+
+  plot_df_all <- data.frame()
+  obs_df_all <- data.frame()
+  true_df_all <- data.frame()
+
+  for (i in seq_len(n_indicators)) {
+
+    ## ---- Indicator samples ----
+    indicator_names <- paste0("^", data_name, "\\[", i, ",")
+    var_names <- grep(indicator_names, variables(get_samples()), value = TRUE)
+
+    samples_indicator <- as_draws_matrix(
+      subset(get_samples(), variable = var_names)
+    )
+
+    mean_vals <- colMeans(samples_indicator)
+    lb_vals <- apply(samples_indicator, 2, quantile, alpha)
+    ub_vals <- apply(samples_indicator, 2, quantile, 1 - alpha)
+
+    indicator_df <- data.frame(
+      time = time_index,
+      mean = mean_vals,
+      lb = lb_vals,
+      ub = ub_vals,
+      indicator = paste("Indicator", i),
+      type = "indicator"
+    )
+
+    plot_df <- indicator_df
+
+    ## ---- Latent smoothing ----
+    if (latent_smooth) {
+
+      latent_names <- paste0("^", latent_name, "\\[", latent_smooth, ",")
+      var_names <- grep(latent_names, variables(get_samples()), value = TRUE)
+
+      samples_latent <- as_draws_matrix(
+        subset(get_samples(), variable = var_names)
+      )
+
+      latent_df <- data.frame(
+        time = time_index,
+        mean = colMeans(samples_latent),
+        lb = apply(samples_latent, 2, quantile, alpha),
+        ub = apply(samples_latent, 2, quantile, 1 - alpha),
+        indicator = paste("Indicator", i),
+        type = "latent"
+      )
+
+      plot_df <- rbind(plot_df, latent_df)
     }
-  #   plot_pred = function(prior = FALSE, latent_smooth = FALSE, ci = 0.95, true_latent = FALSE) {
-  #     require(ggplot2)
-  #     require(posterior)
-  #     require(dplyr)
-  #     require(tidyr)
 
-  #     n_indicators <- self$data$get_d_obs()
-  #     data_name <- self$data$data_name
-  #     latent_name <- self$data$latent_name
-  #     n_time <- self$data$get_time()
+    plot_df_all <- rbind(plot_df_all, plot_df)
 
-  #     ## ---- Sample accessor (no copying) ----
-  #     get_samples <- if (prior) {
-  #       function() self$prior_samples
-  #     } else {
-  #       function() self$posterior_samples
-  #     }
+    ## ---- Observed data ----
+    obs_df <- data.frame(
+      time = time_index,
+      value = self$data$data[i, ],
+      indicator = paste("Indicator", i),
+      type = "observed"
+    )
 
-  #     alpha <- (1 - ci) / 2
-  #     time_index <- seq_len(n_time)
+    obs_df_all <- rbind(obs_df_all, obs_df)
 
-  #     ## ---- Build indicator summary data ----
-  #     plot_list <- vector("list", n_indicators)
+    ## ---- True latent ----
+    if (!identical(true_latent, FALSE)) {
 
-  #     for (i in seq_len(n_indicators)) {
-  #       ## Indicator samples
-  #       indicator_names <- paste0("^", data_name, "\\[", i, ",")
-  #       samples_indicator <- as_draws_matrix(subset(
-  #         get_samples(),
-  #         variable = grep(indicator_names, variables(get_samples()),
-  #           value = TRUE
-  #         )
-  #       ))
+      true_df <- data.frame(
+        time = time_index,
+        value = true_latent,
+        indicator = paste("Indicator", i),
+        type = "true"
+      )
 
-  #       indicator_df <- tibble(
-  #         time = time_index,
-  #         mean = colMeans(samples_indicator),
-  #         lb = apply(samples_indicator, 2, quantile, alpha),
-  #         ub = apply(samples_indicator, 2, quantile, 1 - alpha),
-  #         indicator = paste("Indicator", i),
-  #         type = "indicator"
-  #       )
+      true_df_all <- rbind(true_df_all, true_df)
+    }
+  }
 
-  #       plot_df <- indicator_df
+  ## ---- Build ggplot ----
+  p <- ggplot()
 
-  #       ## ---- Optional latent smoothing ----
-  #       if (latent_smooth) {
-  #         latent_names <- paste0("^", latent_name, "\\[", latent_smooth, ",")
-  #         samples_latent <- as_draws_matrix(subset(
-  #           get_samples(),
-  #           variable = grep(latent_names, variables(get_samples()),
-  #             value = TRUE
-  #           )
-  #         ))
+  indicator_df <- subset(plot_df_all, type == "indicator")
 
-  #         latent_df <- tibble(
-  #           time = time_index,
-  #           mean = colMeans(samples_latent),
-  #           lb = apply(samples_latent, 2, quantile, alpha),
-  #           ub = apply(samples_latent, 2, quantile, 1 - alpha),
-  #           indicator = paste("Indicator", i),
-  #           type = "latent"
-  #         )
+  p <- p +
+    geom_ribbon(
+      data = indicator_df,
+      aes(x = time, ymin = lb, ymax = ub, fill = "Credible Interval"),
+      alpha = 0.15
+    )
 
-  #         plot_df <- bind_rows(plot_df, latent_df)
-  #       }
+  if (latent_smooth) {
 
-  #       ## ---- Observed data ----
-  #       obs_df <- tibble(
-  #         time = time_index,
-  #         value = self$data$data[i, ],
-  #         indicator = paste("Indicator", i),
-  #         type = "observed"
-  #       )
+    latent_df <- subset(plot_df_all, type == "latent")
 
-  #       ## ---- True latent (optional) ----
-  #       if (!identical(true_latent, FALSE)) {
-  #         true_df <- tibble(
-  #           time = time_index,
-  #           value = true_latent,
-  #           indicator = paste("Indicator", i),
-  #           type = "true"
-  #         )
-  #       } else {
-  #         true_df <- NULL
-  #       }
+    p <- p +
+      geom_ribbon(
+        data = latent_df,
+        aes(x = time, ymin = lb, ymax = ub, fill = "Latent Smooth CI"),
+        alpha = 0.25
+      )
+  }
 
-  #       plot_list[[i]] <- list(
-  #         plot_df = plot_df, obs_df = obs_df,
-  #         true_df = true_df
-  #       )
-  #     }
+  p <- p +
+    geom_line(
+      data = indicator_df,
+      aes(x = time, y = mean, linetype = "Posterior Mean"),
+      linewidth = 1
+    ) +
+    geom_point(
+      data = obs_df_all,
+      aes(x = time, y = value, shape = "Observed Data"),
+      size = 1.8
+    )
 
-  #     ## ---- Combine all panels ----
-  #     plot_df_all <- bind_rows(lapply(plot_list, `[[`, "plot_df"))
-  #     obs_df_all <- bind_rows(lapply(plot_list, `[[`, "obs_df"))
-  #     true_df_all <- bind_rows(lapply(plot_list, `[[`, "true_df"))
+  if (!identical(true_latent, FALSE)) {
 
-  #     ## ---- Build ggplot ----
-  #     p <- ggplot() +
+    p <- p +
+      geom_line(
+        data = true_df_all,
+        aes(x = time, y = value, linetype = "True Latent"),
+        linewidth = 1
+      )
+  }
 
-  #       ## Indicator CI
-  #       geom_ribbon(
-  #         data = plot_df_all %>% filter(type == "indicator"),
-  #         aes(x = time, ymin = lb, ymax = ub, fill = "Credible Interval"),
-  #         alpha = 0.15
-  #       ) +
+  p <- p +
+    facet_wrap(~indicator, scales = "free_y") +
+    scale_fill_manual(
+      name = "",
+      values = c(
+        "Credible Interval" = "#1B4F72",
+        "Latent Smooth CI"  = "#1B4F72"
+      )
+    ) +
+    scale_linetype_manual(
+      name = "",
+      values = c(
+        "Posterior Mean" = "dashed",
+        "True Latent" = "solid"
+      )
+    ) +
+    scale_shape_manual(
+      name = "",
+      values = c("Observed Data" = 16)
+    ) +
+    labs(
+      x = "Time",
+      y = "Latent Variable",
+      title = if (prior) "Prior Predictive" else "Posterior Predictive"
+    ) +
+    theme_minimal(base_size = 14) +
+    theme(
+      legend.position = "bottom",
+      legend.box = "horizontal",
+      strip.text = element_text(size = 12, face = "bold"),
+      plot.title = element_text(size = 16, face = "bold"),
+      panel.grid.minor = element_blank()
+    )
 
-  #       ## Latent smooth CI (optional)
-  #       {
-  #         if (latent_smooth) {
-  #           geom_ribbon(
-  #             data = plot_df_all %>% filter(type == "latent"),
-  #             aes(x = time, ymin = lb, ymax = ub, fill = "Latent Smooth CI"),
-  #             alpha = 0.25
-  #           )
-  #         }
-  #       } +
-
-  #       ## Posterior mean
-  #       geom_line(
-  #         data = plot_df_all %>% filter(type == "indicator"),
-  #         aes(x = time, y = mean, linetype = "Posterior Mean"),
-  #         linewidth = 1
-  #       ) +
-
-  #       ## Observed data
-  #       geom_point(
-  #         data = obs_df_all,
-  #         aes(x = time, y = value, shape = "Observed Data"),
-  #         size = 1.8
-  #       ) +
-
-  #       ## True latent (optional)
-  #       {
-  #         if (!identical(true_latent, FALSE)) {
-  #           geom_line(
-  #             data = true_df_all,
-  #             aes(x = time, y = value, linetype = "True Latent"),
-  #             linewidth = 1
-  #           )
-  #         }
-  #       } +
-  #       facet_wrap(~indicator, scales = "free_y") +
-  #       scale_fill_manual(
-  #         name = "",
-  #         values = c(
-  #           "Credible Interval" = "#1B4F72",
-  #           "Latent Smooth CI"  = "#1B4F72"
-  #         )
-  #       ) +
-  #       scale_linetype_manual(
-  #         name = "",
-  #         values = c(
-  #           "Posterior Mean" = "dashed",
-  #           "True Latent" = "solid"
-  #         )
-  #       ) +
-  #       scale_shape_manual(
-  #         name = "",
-  #         values = c("Observed Data" = 16)
-  #       ) +
-  #       labs(
-  #         x = "Time",
-  #         y = "Latent Variable",
-  #         title = if (prior) "Prior Predictive" else "Posterior Predictive"
-  #       ) +
-  #       theme_minimal(base_size = 14) +
-  #       theme(
-  #         legend.position = "bottom",
-  #         legend.box = "horizontal",
-  #         legend.spacing.x = unit(0.5, "cm"),
-  #         strip.text = element_text(size = 12, face = "bold"),
-  #         plot.title = element_text(size = 16, face = "bold"),
-  #         panel.grid.minor = element_blank()
-  #       )
-
-  #     print(p)
-  #   }
+  print(p)    
+  }
   )
 )
 

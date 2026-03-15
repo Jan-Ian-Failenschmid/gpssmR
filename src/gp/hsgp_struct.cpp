@@ -1,6 +1,7 @@
 // [[Rcpp::depends(RcppArmadillo)]]
 
 #include <RcppArmadillo.h>
+#include "base_structs.h"
 #include "hsgp_struct.h"
 #include "hsgp_helper.h"
 

@@ -1,7 +1,7 @@
 #ifndef IMC_GP_CLASS_H
 #define IMC_GP_CLASS_H
 
-// [[Rcpp::depends(RcppArmadillo)]]
+#include <RcppArmadillo.h>
 #include "base_structs.h"
 
 struct imc_gp : public gp_base
