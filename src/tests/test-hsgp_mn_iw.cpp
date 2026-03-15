@@ -2,13 +2,12 @@
 
 #include <testthat.h>
 #include <RcppArmadillo.h>
-#include "t_helper.h"
+#include "test_helper.h"
 #include "linear_algebra.h"
-#include "matniw_gp_class.h"
-#include "hsgp_class.h"
+#include "hsgp_struct.h"
 #include "base_structs.h"
 #include "derived_structs.h"
-#include "initializers.h"
+#include "main_helper.h"
 
 context("C++ HSGP Matrix-normal-inverse-Wishart")
 {
@@ -60,23 +59,6 @@ context("C++ HSGP Matrix-normal-inverse-Wishart")
         dyn_mat_mean.zeros();
 
         // Computation
-        // Imc_iw old
-        matniw_gp_model matniw_gp_model(
-            basis_fun_index,
-            boundry_factor,
-            hyperparameters,
-            dyn_mat_const,
-            covar_mat_const,
-            dyn_mat_mean,
-            covar_mat_mean,
-            covar_prior_col_cov,
-            cov_df,
-            cov_scale);
-
-        matniw_gp_model.update_hyperparameters(5.0, 1.0);
-        matniw_gp_model.update_data(Y, X, covariate);
-        matniw_gp_model.calc_posterior_parameters();
-
         // New model
         arma::mat covar_col_cov_chol = chol(covar_prior_col_cov, "lower");
         arma::mat cov_scale_chol = chol(cov_scale, "lower");
@@ -106,8 +88,6 @@ context("C++ HSGP Matrix-normal-inverse-Wishart")
         Rcpp::Rcerr.precision(15);
 
         // Prior mean mean
-        // matniw_gp_model.prior_des_mat_mean.raw_print(Rcpp::Rcerr);
-        // mn_chain->mn1->param_prior.raw_print(Rcpp::Rcerr);
         // mn_iw_modeld.mn->coefficient_prior->raw_print(Rcpp::Rcerr);
         arma::mat mn_param_prior = {
             {0, 0, 0, 0, 1.85282612544816, -2.21148730568689},
@@ -116,8 +96,6 @@ context("C++ HSGP Matrix-normal-inverse-Wishart")
             *mn_iw_modeld.mn->coefficient_prior, mn_param_prior, 1e-10));
 
         // Posterior mean
-        // matniw_gp_model.post_des_mat_mean.raw_print(Rcpp::Rcerr);
-        // mn_chain->mn1->param_posterior.raw_print(Rcpp::Rcerr);
         // mn_iw_modeld.mn->coefficient_posterior.raw_print(Rcpp::Rcerr);
 
         arma::mat mn_param_posterior = {
@@ -134,9 +112,7 @@ context("C++ HSGP Matrix-normal-inverse-Wishart")
                         mn_param_posterior, 1e-10));
 
         // Prior column covariance
-        // matniw_gp_model.prior_col_cov.raw_print(Rcpp::Rcerr);
         // mn_iw_modeld.mn->col_cov_prior.raw_print(Rcpp::Rcerr);
-        // mn_chain->mn1->col_cov_prior.raw_print(Rcpp::Rcerr);
         arma::mat mn_col_cov_prior = {
             {53.710138861395, 0, 0, 0, 0, 0},
             {0, 42.6182658055272, 0, 0, 0, 0},
@@ -148,7 +124,6 @@ context("C++ HSGP Matrix-normal-inverse-Wishart")
                                 mn_col_cov_prior, 1e-10));
 
         // Posterior column covariance
-        // matniw_gp_model.post_col_cov.raw_print(Rcpp::Rcerr);
         // Rcpp::Rcerr << std::endl;
         // mn_iw_modeld.mn->col_cov_posterior.raw_print(Rcpp::Rcerr);
         arma::mat mn_col_cov_posterior = {
@@ -167,11 +142,6 @@ context("C++ HSGP Matrix-normal-inverse-Wishart")
 
         expect_true(compare_mat(mn_iw_modeld.mn->col_cov_posterior,
                                 mn_col_cov_posterior, 1e-10));
-
-        set_r_seed(2);
-        matniw_gp_model.sample_joint_posterior();
-        // matniw_gp_model.cov.raw_print(Rcpp::Rcerr);
-        // matniw_gp_model.des_mat.raw_print(Rcpp::Rcerr);
 
         // Posterior sample
         set_r_seed(2);
@@ -196,7 +166,6 @@ context("C++ HSGP Matrix-normal-inverse-Wishart")
 
         // Log-likelihood
         // Rcpp::Rcerr << gp_mn_iw.log_marginal_likelihood() << std::endl;
-        // Rcpp::Rcerr << matniw_gp_model.log_marginal_likelihood() << std::endl;
         expect_true(
             compare_double(mn_iw_modeld.log_marginal_likelihood(),
                            -144.087446069717, 1e-10));

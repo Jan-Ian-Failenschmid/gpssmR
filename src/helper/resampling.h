@@ -1,8 +1,6 @@
 #ifndef RESAMPLING_H
 #define RESAMPLING_H
 
-// [[Rcpp::depends(RcppArmadillo)]]
-
 #include <RcppArmadillo.h>
 
 // Template function — header-only

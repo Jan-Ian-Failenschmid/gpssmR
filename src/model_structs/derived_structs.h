@@ -4,8 +4,8 @@
 // #include <RcppArmadillo.h>
 // #include "linear_algebra.h"
 #include "base_structs.h"
-// #include "imc_gp_class.h"
-// #include "hsgp_class.h"
+// #include "imc_gp_struct.h"
+// #include "hsgp_struct.h"
 // #include <rcpptimer.h>
 // #include "timer.h"
 
@@ -216,55 +216,6 @@ struct model_wrapper_base
         return param_ptr->cols(d_pred, d_pred + d_covariate - 1);
     }
 };
-
-// struct wrapped_model
-// {
-//     std::unique_ptr<model_wrapper_base> wrapper;
-//     std::unique_ptr<model_base> model;
-
-//     wrapped_model(std::unique_ptr<model_wrapper_base> wrapper_,
-//                   std::unique_ptr<model_base> model_)
-//         : wrapper(std::move(wrapper_)), model(std::move(model))
-
-//                                             void update_predictor()
-//     {
-//         wrapper->combine_data();
-//         model->calc_marginal_parameters();
-//     };
-// };
-
-// struct gp_model : public model_base
-// {
-//     std::unique_ptr<wrapped_model> wrapped_model;
-//     std::unique_ptr<gp_base> gp;
-
-//     gp_model(std::unique_ptr<wrapped_model> wrapped_model_,
-//              std::unique_ptr<model_base> gp_)
-//         : wrapped_model(std::move(wrapped_model_)), gp(std::move(gp_));
-
-//     void update_predictor()
-//     {
-//         gp->update_predictor(*wrapper->predictor);
-//         gp->update_col_cov_chol();
-//         gp->update_mean_prior();
-
-//         wrapper->combine_data();
-//         wrapper->combine_priors();
-        
-//         model->calc_marginal_parameters();
-//     };
-
-//     void update_hyperparameters(double alpha, double rho)
-//     {
-//         gp->set_hyperparameters(alpha, rho);
-//         gp->update_col_cov_chol();
-//         gp->update_mean_prior();
-
-//         wrapper->combine_priors();
-
-//         model->calc_marginal_parameters();
-//     };
-// };
 
 struct mvn_covar_wrapper : public model_wrapper_base
 {

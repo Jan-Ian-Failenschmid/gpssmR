@@ -2,8 +2,7 @@
 
 #include <testthat.h>
 #include <RcppArmadillo.h>
-#include "t_helper.h"
-
+#include "test_helper.h"
 context("C++ R Seed")
 {
   test_that("Set R seed to Armadillo")

@@ -2,12 +2,11 @@
 
 #include <testthat.h>
 #include <RcppArmadillo.h>
-#include "t_helper.h"
+#include "test_helper.h"
 #include "linear_algebra.h"
-#include "multniw_model_class.h"
 #include "base_structs.h"
 #include "derived_structs.h"
-#include "initializers.h"
+#include "main_helper.h"
 
 context("C++ Multivariate-normal-inverse-Wishart")
 {
@@ -59,24 +58,6 @@ context("C++ Multivariate-normal-inverse-Wishart")
         // data.predictors = {&X, &covariate};
 
         // Computation
-        // Model 1
-        multniw_model multniw_model1(
-            des_mat_const,
-            covar_mat_const,
-            des_mat_mean,
-            covar_mat_mean,
-            prior_cov,
-            covar_prior_cov,
-            cov_df,
-            cov_scale);
-        multniw_model1.update_data(Y, X, covariate);
-        set_r_seed(2);
-        multniw_model1.sample_prior();
-        multniw_model1.calc_posterior_parameters();
-        // multniw_model1.sample_posterior_des_mat_cond_cov();
-        // multniw_model1.sample_posterior_cov_cond_des_mat();
-
-        // Model 2
         arma::mat data_mean = Y;
         data_mean.zeros();
 
@@ -105,7 +86,6 @@ context("C++ Multivariate-normal-inverse-Wishart")
         // Prior cov sample
         Rcpp::Rcerr.precision(15);
         // multniw_model2.iw->get_cov().raw_print(Rcpp::Rcerr);
-        // multniw_model1.cov.raw_print(Rcpp::Rcerr);
         // multniw_model2.mvn->cov_prior.raw_print(Rcpp::Rcerr);
 
         arma::mat prior_cov_sample = {
@@ -123,7 +103,6 @@ context("C++ Multivariate-normal-inverse-Wishart")
 
         // Posterior mean
         // multniw_model2.mvn->mean_posterior.raw_print(Rcpp::Rcerr);
-        // multniw_model1.post_mean.raw_print(Rcpp::Rcerr);
         arma::vec posterior_mean = {
             1.52883767295901, -0.277212425771659, 0.0980639933164831,
             -2.87072565287718};
@@ -135,8 +114,6 @@ context("C++ Multivariate-normal-inverse-Wishart")
         // Posterior cov
 
         // multniw_model2.mvn->cov_posterior.raw_print(Rcpp::Rcerr);
-        // multniw_model1.post_cov.raw_print(Rcpp::Rcerr);
-
         arma::mat posterior_covariance = {
             {0.00448136954778958, -0.00228235275119866, 1.53683861127445e-05, -4.72289835398757e-05},
             {-0.00228235275119866, 0.00716353876781744, -8.33712778975189e-05, 4.45471280415266e-05},
@@ -148,15 +125,9 @@ context("C++ Multivariate-normal-inverse-Wishart")
 
         // Posterior sample_mean
         set_r_seed(3);
-        multniw_model1.sample_posterior_des_mat_cond_cov();
-        multniw_model1.sample_posterior_cov_cond_des_mat();
-
-        set_r_seed(3);
         multniw_model2.sample_posterior();
 
         // model_wrapper.get_pred_param().raw_print(Rcpp::Rcerr);
-        // multniw_model1.des_mat.raw_print(Rcpp::Rcerr);
-
         arma::mat posterior_param_sample = {
             {1.0, -0.00242569121853596},
             {1.49780861793135, 0.0},
@@ -169,8 +140,6 @@ context("C++ Multivariate-normal-inverse-Wishart")
 
         // Posterior sample_cov
         // multniw_model2.iw->get_cov().raw_print(Rcpp::Rcerr);
-        // multniw_model1.cov.raw_print(Rcpp::Rcerr);
-
         arma::mat posterior_cov_sample = {
             {0.936093903463749, -0.0744679452097038,
              0.0114717724579501, -0.447879919193225},

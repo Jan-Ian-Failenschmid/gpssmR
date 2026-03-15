@@ -2,13 +2,11 @@
 
 #include <testthat.h>
 #include <RcppArmadillo.h>
-#include "t_helper.h"
+#include "test_helper.h"
 #include "linear_algebra.h"
-#include "imc_iw_class.h"
-#include "imc_gp_class.h"
 #include "base_structs.h"
 #include "derived_structs.h"
-#include "initializers.h"
+#include "main_helper.h"
 
 context("C++ GP Matrix-normal-inverse-Wishart")
 {
@@ -54,22 +52,13 @@ context("C++ GP Matrix-normal-inverse-Wishart")
         // data.predictors = {&X, &covariate, &identity_pred};
 
         // Computation
-        // Imc_iw old
-        imc_iw matniw_gp_model(
-            hyperparameters,
-            covar_mat_mean,
-            covar_prior_col_cov,
-            cov_df,
-            cov_scale);
-        matniw_gp_model.update_data(Y, X, covariate);
-        matniw_gp_model.calc_posterior_parameters();
         // New model
         arma::mat covar_col_cov_chol = chol(covar_prior_col_cov, "lower");
         arma::mat cov_scale_chol = chol(cov_scale, "lower");
         arma::mat data_cov = identity(n);
 
         auto gp = std::make_unique<imc_gp>();
-        // gp->update_train_data(X, Y); // Y is not really needed here 
+        // gp->update_train_data(X, Y); // Y is not really needed here
         gp->set_hyperparameters(5.0, 1.0);
         gp->update_predictor(X);
 
@@ -102,8 +91,7 @@ context("C++ GP Matrix-normal-inverse-Wishart")
 
         // Posterior correcly attached to row_cov
         set_r_seed(2);
-        matniw_gp_model.sample_joint_posterior();
-        // matniw_gp_model.cov.raw_print(Rcpp::Rcerr);
+
         set_r_seed(2);
         mn_iw_modeld.sample_posterior();
         // mn_iw_modeld.iw->cov.raw_print(Rcpp::Rcerr);
@@ -117,7 +105,7 @@ context("C++ GP Matrix-normal-inverse-Wishart")
                         posterior_cov_sample, 1e-10));
 
         // log_likelihood
-        // Rcpp::Rcerr << matniw_gp_model.log_marginal_likelihood() << std::endl;
+
         // Rcpp::Rcerr << mn_iw_modeld.log_marginal_likelihood() << std::endl;
 
         expect_true(

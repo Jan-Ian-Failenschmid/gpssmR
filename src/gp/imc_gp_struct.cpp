@@ -1,8 +1,7 @@
 // [[Rcpp::depends(RcppArmadillo)]]
-// [[Rcpp::depends(RcppProgress)]]
 
 #include <RcppArmadillo.h>
-#include "imc_gp_class.h"
+#include "imc_gp_struct.h"
 #include "imc_gp_helper.h"
 #include "linear_algebra.h"
 #include "pdfs.h"

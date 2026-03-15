@@ -2,10 +2,11 @@
 #include <RcppArmadillo.h>
 #include "base_structs.h"
 #include "derived_structs.h"
-#include "hsgp_class.h"
-#include "imc_gp_class.h"
+#include "hsgp_struct.h"
+#include "imc_gp_struct.h"
 #include "sim_latent.h"
 #include "pgas.h"
+#include "main_helper.h"
 #include "timer.h"
 
 mn_iw_model_ init_mn_iw_model(

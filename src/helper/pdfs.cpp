@@ -4,7 +4,6 @@
 #include "pdfs.h"
 #include "linear_algebra.h"
 
-
 // Probability distributions
 // Multivariate normal
 double logdnorm(const arma::vec &x, const arma::vec &mu,

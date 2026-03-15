@@ -1,7 +1,7 @@
 // [[Rcpp::depends(RcppArmadillo)]]
 
 #include <RcppArmadillo.h>
-#include "hsgp_class.h"
+#include "hsgp_struct.h"
 #include "hsgp_helper.h"
 
 // Constructor

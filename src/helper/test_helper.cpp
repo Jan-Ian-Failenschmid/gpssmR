@@ -1,6 +1,6 @@
 // [[Rcpp::depends(RcppArmadillo)]]
 #include <RcppArmadillo.h>
-#include "t_helper.h"
+#include "test_helper.h"
 
 // Seeding
 void set_r_seed(double seed)

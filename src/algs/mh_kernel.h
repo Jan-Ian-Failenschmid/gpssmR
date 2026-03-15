@@ -1,7 +1,7 @@
-#ifndef MH_CLASS_H
-#define MH_CLASS_H
+#ifndef MH_KERNEL_H
+#define MH_KERNEL_H
 
-// [[Rcpp::depends(RcppArmadillo)]]
+#include <RcppArmadillo.h>
 
 // MCMC kernel
 struct mh_kernel

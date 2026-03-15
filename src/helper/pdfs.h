@@ -1,7 +1,7 @@
 #ifndef PROBABILITY_DISTRIBUTIONS_H
 #define PROBABILITY_DISTRIBUTIONS_H
 
-// [[Rcpp::depends(RcppArmadillo)]]
+#include <RcppArmadillo.h>
 
 using namespace Rcpp;
 
