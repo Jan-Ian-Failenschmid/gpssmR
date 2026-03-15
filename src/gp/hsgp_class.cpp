@@ -19,7 +19,7 @@ void hsgp_approx::update_hyperparameters(
 {
     alpha = alpha_new;
     rho = rho_new;
-    spdf = gp_spdf_nd_vec(sqrt_lambda, alpha, rho);
+    spdf = gp_spdf_nd_vec(sqrt_lambda, alpha, rho) + 1e-300;
 }
 
 void hsgp_approx::phi_transform(const arma::mat &x)
@@ -57,53 +57,16 @@ arma::mat *hsgp_approx::get_cov_chol_ptr()
 
 void hsgp_approx::set_chol()
 {
-    // Calculate inverse spdf
-    arma::vec inv_spdf = 1.0 / spdf;
-
-    // Adjustment for numerical stability
-    for (size_t i = 0; i < inv_spdf.n_elem; i++)
-    {
-        if (std::isinf(inv_spdf(i)))
-        {
-            inv_spdf(i) = std::numeric_limits<double>::max();
-        }
-    }
-
-    scale_chol = arma::sqrt(arma::diagmat(1.0 / inv_spdf));
+    scale_chol = arma::diagmat(arma::sqrt(spdf));
 }
 
 arma::mat hsgp_approx::inv_scale()
 {
-    // Calculate inverse spdf
-    arma::vec inv_spdf = 1.0 / spdf;
-
-    // Replace inf with machine maximim for stability if spdf is
-    // numerically 0
-    for (size_t i = 0; i < inv_spdf.n_elem; i++)
-    {
-        if (std::isinf(inv_spdf(i)))
-        {
-            inv_spdf(i) = std::numeric_limits<double>::max();
-        }
-    }
-
-    return arma::diagmat(inv_spdf);
+    return arma::diagmat(1.0 / spdf);
 }
 
 arma::mat hsgp_approx::scale()
 {
-    // Calculate inverse spdf
-    arma::vec inv_spdf = 1.0 / spdf;
-
-    // Adjustment for numerical stability
-    for (size_t i = 0; i < inv_spdf.n_elem; i++)
-    {
-        if (std::isinf(inv_spdf(i)))
-        {
-            inv_spdf(i) = std::numeric_limits<double>::max();
-        }
-    }
-
     // Rvert to spdf and return
-    return arma::diagmat(1.0 / inv_spdf);
+    return arma::diagmat(spdf);
 }

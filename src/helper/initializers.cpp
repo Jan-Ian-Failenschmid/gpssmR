@@ -6,6 +6,7 @@
 #include "imc_gp_class.h"
 #include "sim_latent.h"
 #include "pgas.h"
+#include "timer.h"
 
 mn_iw_model_ init_mn_iw_model(
     arma::mat &Y,
@@ -64,12 +65,11 @@ void update_model_hyperparameters(
     mn_iw_model_ &model,
     mn_covar_wrapper &wrapper)
 {
+    timer.tic("mh.gp_hyperpars");
     gp.set_hyperparameters(
         std::exp(hyperparameters[0]),
         std::exp(hyperparameters[1]));
-
     wrapper.combine_priors();
-
     model.mn->stabalize_col_cov_();
     model.mn->calc_marginal_parameters();
     model.iw->calc_posterior_parameters();

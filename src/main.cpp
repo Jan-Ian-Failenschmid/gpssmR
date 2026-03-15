@@ -506,7 +506,6 @@ arma::mat gpssm_sample(
 
     // Initialize progress bar
     Progress p(n_total, disp_prog);
-    Rcpp::Rcout << "New" << std::endl;
 
     // Initialize MH --------
     arma::vec hyperparameters(2);
@@ -767,7 +766,7 @@ arma::mat gpssm_sample(
                 timer.tic("mh.set_hyperpars1");
                 update_model_hyperparameters(rw_mh.prop_par, *gp, dyn_model,
                                              dyn_model_wrapper);
-                timer.toc("mh.set_hyperpars2");
+                timer.toc("mh.set_hyperpars1");
                 timer.tic("mh.calc_pars");
                 // dyn_model.calc_posterior_parameters();
                 timer.toc("mh.calc_pars");

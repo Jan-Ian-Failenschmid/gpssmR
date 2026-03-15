@@ -338,8 +338,7 @@ struct mn_regression_model : public model_base, public regression_base
           row_cov_chol(row_cov_chol_),
           col_cov_prior_chol(col_cov_prior_chol_)
     {
-        construct_cov(col_cov_prior, *col_cov_prior_chol);
-        col_cov_prior_inv = arma::inv_sympd(col_cov_prior);
+        stabalize_col_cov_();
 
         arma::uword d_rows = coefficient_prior->n_rows;
         arma::uword d_cols = coefficient_prior->n_cols;
@@ -353,8 +352,6 @@ struct mn_regression_model : public model_base, public regression_base
 
     void calc_posterior_parameters() override
     {
-        stabalize_col_cov_();
-
         arma::mat Z = data_cov_inv * predictor->t();
         arma::mat sigma = (*predictor) * Z;
         arma::mat psi = (*outcome - *data_mean) * Z;
@@ -363,8 +360,10 @@ struct mn_regression_model : public model_base, public regression_base
         make_symmetric(col_cov_posterior);
 
         col_cov_posterior_chol = arma::chol(col_cov_posterior, "lower");
-        coefficient_posterior =
-            ((*coefficient_prior) * col_cov_prior_inv + psi) * col_cov_posterior;
+        coefficient_posterior = ((*coefficient_prior) *
+                                     col_cov_prior_inv +
+                                 psi) *
+                                col_cov_posterior;
     }
 
     void calc_marginal_mean()
@@ -375,8 +374,9 @@ struct mn_regression_model : public model_base, public regression_base
     void calc_marginal_cov()
     {
         marginal_cov = data_cov + predictor->t() * col_cov_prior * (*predictor);
-
         marginal_cov_chol = arma::chol(marginal_cov, "lower");
+        // marginal_cov_chol = chol_rank_n_update(*data_cov_chol, 1, 
+        //                                        predictor->t() * *col_cov_prior_chol);
     }
 
     void calc_marginal_parameters()
@@ -428,24 +428,29 @@ struct mn_regression_model : public model_base, public regression_base
 
     void stabalize_col_cov_()
     {
+        // construct_cov(col_cov_prior, *col_cov_prior_chol);
         // If I get problems later on I need to fix this
-        stabalized_inv(col_cov_prior,
-                       col_cov_prior_inv,
-                       (*col_cov_prior_chol) * col_cov_prior_chol->t());
+        col_cov_prior = (*col_cov_prior_chol) * col_cov_prior_chol->t();
+        arma::vec inv_spdf = 1.0 / col_cov_prior.diag();
+        col_cov_prior_inv = arma::diagmat(inv_spdf);
+        // stabalized_inv(col_cov_prior,
+        //                col_cov_prior_inv,
+        //                (*col_cov_prior_chol) * col_cov_prior_chol->t());
     }
 
     void set_likelihood_pars(arma::mat *data_mean_, arma::mat *cov_chol_)
     {
         data_mean = data_mean_;
         data_cov_chol = cov_chol_;
-
-        stabalized_inv(data_cov,
-                       data_cov_inv,
-                       (*data_cov_chol) * data_cov_chol->t());
+        data_cov = (*data_cov_chol) * data_cov_chol->t();
+        data_cov_inv = arma::diagmat(1.0 / data_cov.diag());
+            // stabalized_inv(data_cov,
+            //                data_cov_inv,
+            //                (*data_cov_chol) * data_cov_chol->t());
     };
 
     // Getters
-    arma::mat get_marginal_mean() 
+    arma::mat get_marginal_mean()
     {
         return marginal_mean;
     }
