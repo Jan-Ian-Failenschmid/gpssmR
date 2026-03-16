@@ -1,26 +1,56 @@
 #ifndef HSGP_HELPER_H
 #define HSGP_HELPER_H
 
-// [[Rcpp::depends(RcppArmadillo)]]
-// [[Rcpp::depends(RcppProgress)]]
+#include <RcppArmadillo.h>
 
-// Hilbert-space approximate Gaussian processes
-arma::mat gp_sqrt_lambda_nd_vec(
+inline arma::mat gp_sqrt_lambda_nd_vec(
     const arma::rowvec &L, // Boundry factor in each dimension
     const arma::mat &m     // Basis function indicator in each dimension
-);
+)
+{
+    arma::mat m_pi = m * M_PI;
+    // return arma::square(m_pi.each_row() / (2 * L));
+    return m_pi.each_row() / (2 * L); // Return square root of lambda directly
+}
 
-arma::vec gp_spdf_nd_vec(
+// Calculate spectral density kernel ---wd--
+// Calculate kernel of the spectral density for HSGP approximation
+inline arma::vec gp_spdf_nd_vec(
     const arma::mat &Lambda, // Matrix where each row is a lambda vector
     const double &alpha,     // Marginal variance
     const double &rho        // Length scale
-);
+)
+{
+    // ||lambda||^2 for each row
+    arma::vec norms = arma::sum(arma::square(Lambda), 1);
+    double scale = std::pow(alpha, 2) * std::sqrt(2 * M_PI) * rho;
+    arma::vec result = scale * arma::exp(-0.5 * rho * rho * norms);
+    return result;
+}
 
-// This currently includes some redundant calculations
-arma::rowvec gp_phi_nD(
-    const arma::vec &L,           // Boundry factor in each dimension
-    const arma::vec &sqrt_lambda, // Sqrt lambda
-    const arma::mat &X_mat        // Input matrix
-);
+// PHI basis function transformation -----
+// Calculate jth PHI basis function transform of State Variables over time
+// or particles
+inline arma::rowvec gp_phi_nD(
+    const arma::vec &L,
+    const arma::vec &sqrt_lambda,
+    const arma::mat &X_mat)
+{
+    // Calculate PHI j over all columns of a D dimensional state matrix (n, T)
+    // Riutort-Mayol et al., 2023 EQ: 12
+    // Compute sqrt(lambda) and 1/sqrt(L) once
+    arma::vec inv_sqrt_L = arma::sqrt(1.0 / L);
+
+    // Add L to each column of X and multiply each column
+    // element-wise by sqrt_lambda
+    arma::mat sin_X = arma::sin(
+        sqrt_lambda % (X_mat.each_col() + L).each_col());
+
+    // Scale by 1/sqrt(L)
+    arma::mat phi_j = sin_X.each_col() % inv_sqrt_L;
+
+    // Compute the product along each column
+    return arma::prod(phi_j, 0);
+}
 
 #endif

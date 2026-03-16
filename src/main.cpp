@@ -306,11 +306,13 @@ arma::mat gpssm_sample(
             meas_model, meas_model_wrapper,
             t0_mean, t0_cov,
             pg_rep);
+        timer.tic("pgas_outer");
 
         x_out = x.cols(sp_out);
         x_pred = x.cols(sp_pred);
         update_model_predictor(x_pred, *gp, dyn_model, dyn_model_wrapper);
         meas_model_wrapper.combine_data();
+        timer.toc("pgas_outer");
 
         timer.toc("pgas");
 
@@ -341,7 +343,9 @@ arma::mat gpssm_sample(
         rw_mh.advance_iter();
         for (size_t i = 0; i < mh_rep; i++)
         {
+            timer.tic("mh.make_prop");
             rw_mh.make_proposal(); // Make proposal
+            timer.toc("mh.make_prop");
             try
             {
                 timer.tic("mh.set_hyperpars1");
@@ -363,14 +367,17 @@ arma::mat gpssm_sample(
                 Rcpp::Rcout << std::exp(rw_mh.prop_par[1]) << std::endl;
                 rw_mh.proposal_log_lik = -std::numeric_limits<double>::max();
             }
-
+            timer.tic("mh.make_step");
             rw_mh.mh_step(); // Accept or reject proposal
+            timer.tic("mh.make_step");
         }
         rw_mh.tune_proposal(); // Tune proposal based on acceptance ratio
 
         // // Update hyperparameters
+        timer.tic("mh.set_hyperpars2");
         update_model_hyperparameters(rw_mh.par, *gp, dyn_model,
                                      dyn_model_wrapper);
+        timer.toc("mh.set_hyperpars2");
         timer.toc("mh");
 
         // Sample dynamic model parameters -------

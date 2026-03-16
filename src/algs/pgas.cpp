@@ -7,6 +7,7 @@
 #include "base_structs.h"
 #include "derived_structs.h"
 #include "resampling.h"
+#include "timer.h"
 
 // Measurement model -----
 // Measurement model helper function used in PGAS to predict measurements
@@ -53,7 +54,7 @@ arma::mat pgas(
     const int &n_particles,
     const int &n_time,
     const int &d_lat,
-    const hsgp_approx &hsgp,
+    hsgp_approx &hsgp,
     const arma::mat &x_ref,
     const arma::vec &t0_mean,
     const arma::mat &t0_cov,
@@ -66,9 +67,10 @@ arma::mat pgas(
 {
     // PGAS kernel from Lindsten et al. 2014 modified to assumo a Markovian
     // state progression as in Svenson et al. 2016.
-    hsgp_approx hsgp_local = hsgp;
     // Initialize a cube to hold the particle values over all particles N
     // the state dimensions D and the time-points T
+    timer.tic("pgas_inner");
+    timer.tic("pgas_set-up");
     arma::cube x(d_lat, n_particles, n_time);
 
     // Initialize weight matrix
@@ -120,7 +122,7 @@ arma::mat pgas(
     // can be skipped.
     arma::mat weights_cov = des_mat * dyn_cov * des_mat.t() + meas_cov;
     arma::mat weights_cov_chol = chol(weights_cov, "lower");
-
+    arma::mat weights_cov_inv = inv_sympd(weights_cov);
     arma::mat dyn_kalman_gain = dyn_cov * des_mat.t() *
                                 inv_sympd(des_mat * dyn_cov * des_mat.t() +
                                           meas_cov);
@@ -142,11 +144,12 @@ arma::mat pgas(
     // Set starting value of the N_th particle to reference value
     // Step 2 of Algorithm 2 in Svensson et al. 2016
     x.slice(0).col(n_particles - 1) = x_ref.col(0);
-
+    timer.toc("pgas_set-up");
     for (size_t t = 0; t < n_time; t++)
     {
         if (t >= 1)
         {
+            timer.tic("pgas_move");
             // Systematically resample ancestor indices according to importance
             // weights
             // Step 5 of Algorithm 2 in Svensson et al. 2016
@@ -156,7 +159,7 @@ arma::mat pgas(
             // Precalculate predictions of all previous particle states and store in
             // x_pred for later use
             x_pred = transit_model(
-                hsgp_local.basis_functions(x.slice(t - 1)),
+                hsgp.basis_functions(x.slice(t - 1)),
                 covariate_dyn.col(t - 1), trans_mat, lat_covar);
 
             // Resample predictions according to ancestor indices
@@ -165,7 +168,8 @@ arma::mat pgas(
 
             // Make observation prediction based on one-step state forecast
             y_pred.cols(0, n_particles - 2) = meas_model(
-                x_pred_resampled.cols(0, n_particles - 2), covariate_meas.col(t),
+                x_pred_resampled.cols(0, n_particles - 2),
+                covariate_meas.col(t),
                 des_mat, meas_covar);
             residuals.cols(0, n_particles - 2) = -y_pred.cols(0, n_particles - 2);
             residuals.cols(0, n_particles - 2).each_col() += y.col(t);
@@ -186,21 +190,23 @@ arma::mat pgas(
             // Set last particle state to state from the reference path
             // Step 7 of Algorithm 2 in Svensson et al. 2016
             x.slice(t).col(n_particles - 1) = x_ref.col(t); // X^N_(t+1)
-
+            timer.toc("pgas_move");
             // Sample an ancestor index for the reference particle
             // Step 8 of Algorithm 2 in Svensson et al. 2016
             // Calculate the density of predicting the reference particle from each
-            weights_n = arma::trans(mat_logdnorm(
+            timer.tic("pgas_aweights");
+            weights_n = arma::trans(mat_logdnorm_unnorm_inv(
                 arma::vec(x.slice(t).col(n_particles - 1)),
-                x_pred, dyn_cov_chol));
+                x_pred, dyn_cov_inv));
 
             // You can ignore the denominator here since it cancells accorss all
             // weights
             // Elementwise multiply weights and normal densities
             weights_n += log(weights.row(t - 1));
             softmax(weights_n); // Normalize weights
-
+            timer.toc("pgas_aweights");
             // Resample the ancestral path for the reference particle from the weights
+            timer.tic("pgas_weights");
             ancestors.row(t - 1)(n_particles - 1) = systematic_resampling(
                 weights_n, 1)(0);
 
@@ -210,12 +216,14 @@ arma::mat pgas(
                 x_pred.col(ancestors.row(t - 1)(n_particles - 1));
 
             // Calculate weights
-            weights.row(t) = arma::trans(mat_logdnorm(arma::vec(y.col(t)),
-                                                      des_mat * x_pred_resampled, weights_cov_chol));
+            weights.row(t) = arma::trans(mat_logdnorm_unnorm_inv(
+                arma::vec(y.col(t)),
+                des_mat * x_pred_resampled, weights_cov_inv));
+            timer.toc("pgas_weights");
         }
         softmax(weights.row(t));
     }
-
+    timer.tic("pgas_backwards");
     // Initialize a matrix holding the output sample from the invariant
     // state distribution
     arma::mat x_out(d_lat, n_time, arma::fill::zeros);
@@ -233,7 +241,8 @@ arma::mat pgas(
         star = ancestors((n_time - 1) - i, star);
         x_out.col((n_time - 1) - i) = x.slice((n_time - 1) - i).col(star);
     }
-
+    timer.toc("pgas_backwards");
+    timer.toc("pgas_inner");
     // Return new sample from the invariant state distribution
     return x_out;
 }
@@ -245,7 +254,7 @@ arma::mat pgas(
     const int &n_particles,
     const int &n_time,
     const int &d_lat,
-    const imc_gp &gp,
+    imc_gp &gp,
     const arma::mat &x_ref,
     const arma::vec &t0_mean,
     const arma::mat &t0_cov,

@@ -144,7 +144,7 @@ void run_pgas(
     const arma::mat &covariate_dyn,
     const arma::mat &covariate_meas,
     uint n_particles,
-    const gp_base &gp,
+    gp_base &gp,
     const mn_iw_model_ &dyn_model,
     const mn_covar_wrapper &dyn_wrapper,
     const mvn_iw_model_ &meas_model,
@@ -158,7 +158,7 @@ void run_pgas(
 
     for (size_t i = 0; i < pg_rep; i++)
     {
-        if (auto *m = dynamic_cast<const imc_gp *>(&gp))
+        if (auto *m = dynamic_cast<imc_gp *>(&gp))
         {
             x = pgas(
                 y,
@@ -177,7 +177,7 @@ void run_pgas(
                 meas_wrapper.get_covar_param(),
                 meas_model.get_cov());
         }
-        else if (auto *m = dynamic_cast<const hsgp_approx *>(&gp))
+        else if (auto *m = dynamic_cast<hsgp_approx *>(&gp))
         {
             x = pgas(
                 y,

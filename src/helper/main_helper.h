@@ -49,7 +49,7 @@ void run_pgas(
     const arma::mat &covariate_dyn,
     const arma::mat &covariate_meas,
     uint n_particles,
-    const gp_base &gp,
+    gp_base &gp,
     const mn_iw_model_ &dyn_model,
     const mn_covar_wrapper &dyn_wrapper,
     const mvn_iw_model_ &meas_model,
