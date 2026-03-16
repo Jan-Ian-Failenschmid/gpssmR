@@ -98,6 +98,30 @@ void stabalized_inv(arma::mat &cov, arma::mat &cov_inv, const arma::mat &cov_)
     }
 }
 
+void fast_inv(arma::mat &cov_inv, const arma::mat &cov_)
+{
+    try
+    {
+        if (cov_.is_diagmat())
+        {
+            arma::vec d = cov_.diag();
+            arma::vec inv_d = 1.0 / d; // Invert diagmat
+
+            // Invert back
+            cov_inv = arma::diagmat(inv_d);
+        }
+        else
+        {
+            cov_inv = arma::inv_sympd(cov_);
+        }
+    }
+    catch (const std::exception &e)
+    {
+        Rcpp::Rcout << "Exception caught in fast_inv: "
+                    << e.what() << std::endl;
+    }
+}
+
 // Construct covariance matrix from cholesky pointer
 void construct_cov(arma::mat &cov, const arma::mat &cov_chol) {
     cov = cov_chol * cov_chol.t();

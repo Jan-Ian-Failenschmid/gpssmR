@@ -291,8 +291,9 @@ struct mn_regression_model : public model_base, public regression_base
         // construct_cov(col_cov_prior, *col_cov_prior_chol);
         // If I get problems later on I need to fix this
         col_cov_prior = (*col_cov_prior_chol) * col_cov_prior_chol->t();
-        arma::vec inv_spdf = 1.0 / col_cov_prior.diag();
-        col_cov_prior_inv = arma::diagmat(inv_spdf);
+        fast_inv(col_cov_prior_inv, col_cov_prior);
+        // arma::vec inv_spdf = 1.0 / col_cov_prior.diag();
+        // col_cov_prior_inv = arma::diagmat(inv_spdf);
         // stabalized_inv(col_cov_prior,
         //                col_cov_prior_inv,
         //                (*col_cov_prior_chol) * col_cov_prior_chol->t());
@@ -303,7 +304,8 @@ struct mn_regression_model : public model_base, public regression_base
         data_mean = data_mean_;
         data_cov_chol = cov_chol_;
         data_cov = (*data_cov_chol) * data_cov_chol->t();
-        data_cov_inv = arma::diagmat(1.0 / data_cov.diag());
+        fast_inv(data_cov_inv, data_cov);
+        // data_cov_inv = arma::diagmat(1.0 / data_cov.diag());
             // stabalized_inv(data_cov,
             //                data_cov_inv,
             //                (*data_cov_chol) * data_cov_chol->t());

@@ -7,10 +7,10 @@
 #include <cmath> // For M_PI
 #include <rcpptimer.h>
 
-#include "pdfs.h"
 #include "linear_algebra.h"
 #include "resampling.h"
 #include "hsgp_struct.h"
+#include "imc_gp_struct.h"
 #include "mh_kernel.h"
 #include "pgas.h"
 #include "sim_latent.h"

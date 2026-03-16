@@ -21,6 +21,7 @@ arma::mat expand_grid_2d(const arma::vec &a, const arma::vec &b);
 void jitter_mat(arma::mat &K, double delta);
 
 // Stabailized matrix inverse
+void fast_inv(arma::mat &cov_inv, const arma::mat &cov_);
 void stabalized_inv(arma::mat &cov, arma::mat &cov_inv, const arma::mat &cov_);
 
 // Construct covariance matrix from cholesky pointer
