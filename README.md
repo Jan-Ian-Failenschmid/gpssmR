@@ -17,7 +17,7 @@ accessing the samplers for their posterior and prior predictive distributions.
 ### Structure
 
 - `gpssm.R`: Core R classes and user-facing interface
-- C++ backend: Sampler implementation exposed via `Rcpp`
+- C++: Sampler implementation exposed via `Rcpp`
 
 ### Installation
 
