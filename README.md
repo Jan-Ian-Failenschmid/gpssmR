@@ -25,6 +25,6 @@ Install from source:
 
 ```r
 # install.packages("devtools")
-devtools::install_github("your-username/gpssmR")
+devtools::install_github("Jan-Ian-Failenschmid/gpssmR")
 
 ```
