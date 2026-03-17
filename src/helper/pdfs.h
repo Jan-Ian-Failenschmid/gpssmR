@@ -216,4 +216,32 @@ inline double log_dmatrixt(
     return log_marg_likelihood;
 }
 
+inline double log_dmatrixt(
+    const arma::mat &prior_col_chol,
+    const arma::mat &posterior_col_chol,
+    const arma::mat &prior_cov_scale_chol,
+    const arma::mat &post_cov_scale_chol,
+    uint v_prior,
+    uint v_post)
+{
+    uint dy = prior_cov_scale_chol.n_cols;
+    uint n = v_post - v_prior;
+
+    double log_det_prior_col = log_det_chol(prior_col_chol);
+    double log_det_posterior_col = log_det_chol(posterior_col_chol);
+    double log_det_prior_cov_scale = log_det_chol(prior_cov_scale_chol);
+    double log_det_post_cov_scale = log_det_chol(post_cov_scale_chol);
+
+    double log_marg_likelihood =
+        -std::log(M_PI) * (dy * n / 2.0) -
+        (dy / 2.0) * log_det_prior_col +
+        (dy / 2.0) * log_det_posterior_col +
+        (v_prior / 2.0) * log_det_prior_cov_scale -
+        (v_post / 2.0) * log_det_post_cov_scale +
+        log_mvgamma((v_post / 2.0), dy) -
+        log_mvgamma((v_prior / 2.0), dy);
+
+    return log_marg_likelihood;
+}
+
 #endif

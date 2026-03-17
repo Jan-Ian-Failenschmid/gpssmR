@@ -18,6 +18,9 @@ struct model_base
     arma::uword d_predictor = 0;
     arma::uword n_time = 0;
 
+    bool zero_data_mean = false;
+    bool identity_data_cov = false;
+
     double marginal_log_likelihood = 0.0;
 
     model_base() = default;
@@ -28,6 +31,19 @@ struct model_base
         outcome = outcome_;
         n_time = outcome->n_cols;
     }
+
+    void check_data_mean()
+    {
+        zero_data_mean = arma::all(
+            arma::abs(arma::vectorise(*data_mean)) <= 1e-10);
+    };
+
+    void check_data_cov()
+    {
+        identity_data_cov = approx_equal(
+            *data_cov_chol,
+            identity(data_cov_chol->n_cols), "absdiff", 1e-10);
+    };
 
     virtual void calc_posterior_parameters() = 0;
     virtual void sample_prior() = 0;
@@ -106,12 +122,19 @@ struct iw_model_ : public model_base
 
     void calc_posterior_parameters() override
     {
+        check_data_cov();
+        // Sufficient Statistics
         diff = *outcome - *data_mean;
-
-        z = chol_left_solve(*data_cov_chol, diff.t());
+        if (identity_data_cov)
+        {
+            z = diff.t();
+        }
+        else
+        {
+            z = chol_left_solve(*data_cov_chol, diff.t());
+        }
 
         v_posterior = v_prior + n_time;
-
         cov_scale_posterior = cov_scale_prior + z.t() * z;
         // cov_scale_posterior = cov_scale_prior + diff *
         //                                             arma::inv_sympd(data_cov) * diff.t();
@@ -170,6 +193,145 @@ struct iw_model_ : public model_base
     }
 };
 
+// Base model for matrix normal likelihood with Inverse-Wishart prior
+struct iw_model_conjugate : public model_base
+{
+    arma::mat cov;
+    arma::mat chol_cov;
+
+    arma::uword v_prior;
+    arma::mat cov_scale_prior;
+    arma::mat *cov_scale_prior_chol = nullptr;
+
+    arma::uword v_posterior;
+    arma::mat cov_scale_posterior;
+    arma::mat cov_scale_posterior_chol;
+
+    arma::mat *prior_col_cov_chol = nullptr;
+    arma::mat *prior_col_cov_inv = nullptr;
+    arma::mat *prior_mean = nullptr;
+
+    arma::mat *posterior_col_cov_chol = nullptr;
+    arma::mat *posterior_col_cov_inv = nullptr;
+    arma::mat *posterior_mean = nullptr;
+
+    arma::mat diff;
+    arma::mat z;
+
+    iw_model_conjugate(arma::uword v_prior_,
+                       arma::mat *cov_scale_prior_chol_)
+        : v_prior(v_prior_),
+          cov_scale_prior_chol(cov_scale_prior_chol_)
+    {
+        construct_cov(cov_scale_prior, *cov_scale_prior_chol);
+
+        arma::uword d = cov_scale_prior.n_rows;
+
+        cov_scale_posterior.set_size(d, d);
+        cov_scale_posterior_chol.set_size(d, d);
+        cov.set_size(d, d);
+    }
+
+    void calc_posterior_parameters() override
+    {
+
+        // Sufficient Statistics
+        diff = *outcome - *data_mean;
+        if (identity_data_cov)
+        {
+            z = diff.t();
+        }
+        else
+        {
+            z = chol_left_solve(*data_cov_chol, diff.t());
+        }
+
+        v_posterior = v_prior + n_time;
+        cov_scale_posterior =
+            cov_scale_prior + z.t() * z +
+            *prior_mean * *prior_col_cov_inv * prior_mean->t() -
+            *posterior_mean * *posterior_col_cov_inv * posterior_mean->t();
+        make_symmetric(cov_scale_posterior);
+        // cov_scale_posterior = cov_scale_prior + diff *
+        //                                             arma::inv_sympd(data_cov) * diff.t();
+        cov_scale_posterior_chol = arma::chol(cov_scale_posterior, "lower");
+    }
+
+    void sample_prior() override
+    {
+        arma::iwishrnd(cov, cov_scale_prior, v_prior);
+        chol_cov = arma::chol(cov, "lower");
+    }
+
+    void sample_posterior() override
+    {
+        arma::iwishrnd(cov, cov_scale_posterior, v_posterior);
+        chol_cov = arma::chol(cov, "lower");
+    }
+
+    double log_marginal_likelihood() override
+    {
+        marginal_log_likelihood = log_dmatrixt(
+            *prior_col_cov_chol,
+            *posterior_col_cov_chol,
+            *cov_scale_prior_chol,
+            cov_scale_posterior_chol,
+            v_prior,
+            v_posterior);
+
+        return marginal_log_likelihood;
+    }
+
+    // Setters
+    void set_likelihood_pars(arma::mat *data_mean_, arma::mat *cov_chol_)
+    {
+        data_mean = data_mean_;
+        data_cov_chol = cov_chol_;
+        check_data_cov();
+    };
+
+    void set_mn_prior_pointers(
+        arma::mat *prior_mean_,
+        arma::mat *prior_col_cov_chol_,
+        arma::mat *prior_col_cov_inv_)
+    {
+        prior_col_cov_chol = prior_col_cov_chol_;
+        prior_col_cov_inv = prior_col_cov_inv_;
+        prior_mean = prior_mean_;
+    };
+
+    void set_mn_posterior_pointers(
+        arma::mat *posterior_mean_,
+        arma::mat *posterior_col_cov_chol_,
+        arma::mat *posterior_col_cov_inv_)
+    {
+        posterior_col_cov_chol = posterior_col_cov_chol_;
+        posterior_col_cov_inv = posterior_col_cov_inv_;
+        posterior_mean = posterior_mean_;
+    };
+
+    // Getters
+    arma::mat get_cov() const
+    {
+        return cov;
+    }
+
+    arma::mat *get_cov_ptr()
+    {
+        return &cov;
+    }
+
+    arma::mat get_cov_chol()
+    {
+        return chol_cov;
+    }
+
+    arma::mat *get_cov_chol_ptr()
+    {
+        return &chol_cov;
+    }
+};
+
 struct mn_regression_model : public model_base, public regression_base
 {
     arma::mat *coefficient_prior = nullptr;
@@ -184,6 +346,7 @@ struct mn_regression_model : public model_base, public regression_base
 
     arma::mat col_cov_posterior;
     arma::mat col_cov_posterior_chol;
+    arma::mat col_cov_posterior_inv;
 
     arma::mat data_cov_inv;
 
@@ -205,6 +368,7 @@ struct mn_regression_model : public model_base, public regression_base
 
         col_cov_posterior.set_size(d_cols, d_cols);
         col_cov_posterior_chol.set_size(d_cols, d_cols);
+        col_cov_posterior_inv.set_size(d_cols, d_cols);
 
         coefficient.set_size(d_rows, d_cols);
         coefficient_posterior.set_size(d_rows, d_cols);
@@ -212,11 +376,34 @@ struct mn_regression_model : public model_base, public regression_base
 
     void calc_posterior_parameters() override
     {
-        arma::mat Z = data_cov_inv * predictor->t();
-        arma::mat sigma = (*predictor) * Z;
-        arma::mat psi = (*outcome - *data_mean) * Z;
+        // Sufficient statistics
+        arma::mat Z;
+        arma::mat resid = *outcome - *data_mean;
+        if (identity_data_cov)
+        {
+            Z = predictor->t();
+        }
+        else
+        {
+            Z = data_cov_inv * predictor->t();
+        }
 
-        col_cov_posterior = arma::inv_sympd(sigma + col_cov_prior_inv);
+        arma::mat sigma = (*predictor) * Z;
+        arma::mat psi = resid * Z;
+
+        // Posterior parameters
+        // Invert kxk if k < n and nxn otherwise.
+        col_cov_posterior_inv = sigma + col_cov_prior_inv;
+        if (col_cov_prior.n_cols <= data_cov.n_cols)
+        {
+            col_cov_posterior = arma::inv_sympd(col_cov_posterior_inv);
+        }
+        else
+        {
+            col_cov_posterior = woodbury_inv(
+                col_cov_prior, *predictor, data_cov);
+        }
+
         make_symmetric(col_cov_posterior);
 
         col_cov_posterior_chol = arma::chol(col_cov_posterior, "lower");
@@ -235,7 +422,7 @@ struct mn_regression_model : public model_base, public regression_base
     {
         marginal_cov = data_cov + predictor->t() * col_cov_prior * (*predictor);
         marginal_cov_chol = arma::chol(marginal_cov, "lower");
-        // marginal_cov_chol = chol_rank_n_update(*data_cov_chol, 1, 
+        // marginal_cov_chol = chol_rank_n_update(*data_cov_chol, 1,
         //                                        predictor->t() * *col_cov_prior_chol);
     }
 
@@ -304,11 +491,19 @@ struct mn_regression_model : public model_base, public regression_base
         data_mean = data_mean_;
         data_cov_chol = cov_chol_;
         data_cov = (*data_cov_chol) * data_cov_chol->t();
-        fast_inv(data_cov_inv, data_cov);
-        // data_cov_inv = arma::diagmat(1.0 / data_cov.diag());
-            // stabalized_inv(data_cov,
-            //                data_cov_inv,
-            //                (*data_cov_chol) * data_cov_chol->t());
+
+        // Set efficiency flags
+        check_data_mean();
+        check_data_cov();
+
+        if (identity_data_cov)
+        {
+            data_cov_inv = data_cov;
+        }
+        else
+        {
+            fast_inv(data_cov_inv, data_cov);
+        }
     };
 
     // Getters

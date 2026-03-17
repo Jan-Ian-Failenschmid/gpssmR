@@ -298,7 +298,6 @@ arma::mat gpssm_sample(
         //             meas_model.iw->get_cov());
         //     }
         // }
-
         run_pgas(
             y, x, covariate_dyn, covariate_meas,
             n_particles,
@@ -416,7 +415,6 @@ arma::mat gpssm_sample(
             par_vec.set_size(par_size);
             samples.set_size(n_total / n_thin, par_size);
         }
-
         // Fill parameter vector
         if (k % n_thin == 0)
         {

@@ -17,7 +17,7 @@ mn_iw_model_ init_mn_iw_model(
     arma::mat &cov_scale_chol,
     double cov_df)
 {
-    auto iw = std::make_unique<iw_model_>(cov_df, &cov_scale_chol);
+    auto iw = std::make_unique<iw_model_conjugate>(cov_df, &cov_scale_chol);
 
     auto mn = std::make_unique<mn_regression_model>(
         model_wrapper.get_mean_ptr(),
@@ -31,7 +31,7 @@ mn_iw_model_ init_mn_iw_model(
 
     model.set_outcome(&Y);
     model.set_likelihood_pars(&data_mean, &data_cov);
-    model.mn->calc_marginal_parameters();
+    // model.mn->calc_marginal_parameters();
     return model;
 }
 
@@ -72,8 +72,9 @@ void update_model_hyperparameters(
         std::exp(hyperparameters[1]));
     wrapper.combine_priors();
     model.mn->stabalize_col_cov_();
-    model.mn->calc_marginal_parameters();
-    model.iw->calc_posterior_parameters();
+    model.calc_posterior_parameters();
+    // model.mn->calc_marginal_parameters();
+    // model.iw->calc_posterior_parameters();
 }
 
 void update_model_predictor(
@@ -88,7 +89,8 @@ void update_model_predictor(
     wrapper.combine_priors();
 
     model.mn->stabalize_col_cov_();
-    model.mn->calc_marginal_parameters();
+    model.calc_posterior_parameters();
+    // model.mn->calc_marginal_parameters();
 }
 
 void run_sim_latent(

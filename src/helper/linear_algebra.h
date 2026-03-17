@@ -122,6 +122,18 @@ inline void fast_inv(arma::mat &cov_inv, const arma::mat &cov_)
     }
 }
 
+inline arma::mat woodbury_inv(
+    const arma::mat A_inv,
+    const arma::mat premult_mat,
+    const arma::mat C_inv)
+{
+    arma::mat A_inv_premult = A_inv * premult_mat;
+    arma::mat inner_inv = arma::inv_sympd(
+        C_inv + premult_mat.t() * A_inv_premult);
+
+    return A_inv - A_inv_premult * inner_inv * A_inv_premult.t();
+}
+
 // Construct covariance matrix from cholesky pointer
 inline void construct_cov(arma::mat &cov, const arma::mat &cov_chol)
 {

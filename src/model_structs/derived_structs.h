@@ -9,25 +9,101 @@
 // #include <rcpptimer.h>
 // #include "timer.h"
 
+// struct mn_iw_model_ : public model_base
+// {
+//     std::unique_ptr<iw_model_> iw;
+//     std::unique_ptr<mn_regression_model> mn;
+
+//     mn_iw_model_(std::unique_ptr<mn_regression_model> mn_model_,
+//                  std::unique_ptr<iw_model_> iw_model_)
+//         : iw(std::move(iw_model_)),
+//           mn(std::move(mn_model_))
+//     {
+//         iw->data_mean = mn->get_marginal_mean_ptr();
+//         iw->data_cov_chol = mn->get_marginal_cov_chol_ptr();
+//         mn->set_row_cov(iw->get_cov_chol_ptr());
+//     }
+
+//     void calc_posterior_parameters() override
+//     {
+//         mn->calc_posterior_parameters();
+//         // mn->calc_marginal_parameters();
+//         iw->calc_posterior_parameters();
+//     }
+
+//     void sample_prior() override
+//     {
+//         iw->sample_prior();
+//         mn->sample_prior();
+//     }
+
+//     void sample_posterior() override
+//     {
+//         iw->sample_posterior();
+//         mn->sample_posterior();
+//     }
+
+//     double log_marginal_likelihood() override
+//     {
+//         marginal_log_likelihood = iw->log_marginal_likelihood();
+//         return marginal_log_likelihood;
+//     }
+
+//     // Setters
+//     void set_outcome(const arma::mat *outcome_)
+//     {
+//         model_base::set_outcome(outcome_);
+//         iw->set_outcome(outcome);
+//         mn->set_outcome(outcome);
+//     }
+
+//     void set_likelihood_pars(arma::mat *data_mean_, arma::mat *cov_chol_)
+//     {
+//         mn->set_likelihood_pars(data_mean_, cov_chol_);
+//         iw->set_likelihood_pars(mn->get_marginal_mean_ptr(),
+//                                 mn->get_marginal_cov_chol_ptr());
+//     };
+
+//     // Getters
+//     arma::mat get_cov() const
+//     {
+//         return iw->get_cov();
+//     }
+
+//     arma::mat get_param() const
+//     {
+//         return mn->get_coefficient();
+//     }
+// };
+
 struct mn_iw_model_ : public model_base
 {
-    std::unique_ptr<iw_model_> iw;
+    std::unique_ptr<iw_model_conjugate> iw;
     std::unique_ptr<mn_regression_model> mn;
 
     mn_iw_model_(std::unique_ptr<mn_regression_model> mn_model_,
-                 std::unique_ptr<iw_model_> iw_model_)
+                 std::unique_ptr<iw_model_conjugate> iw_model_)
         : iw(std::move(iw_model_)),
           mn(std::move(mn_model_))
     {
-        iw->data_mean = mn->get_marginal_mean_ptr();
-        iw->data_cov_chol = mn->get_marginal_cov_chol_ptr();
+        // iw->data_mean = mn->get_marginal_mean_ptr();
+        // iw->data_cov_chol = mn->get_marginal_cov_chol_ptr();
+        iw->set_mn_prior_pointers(
+            mn->coefficient_prior,
+            mn->col_cov_prior_chol,
+            &mn->col_cov_prior_inv);
+        iw->set_mn_posterior_pointers(
+            &mn->coefficient_posterior,
+            &mn->col_cov_posterior_chol,
+            &mn->col_cov_posterior_inv);
+
         mn->set_row_cov(iw->get_cov_chol_ptr());
     }
 
     void calc_posterior_parameters() override
     {
         mn->calc_posterior_parameters();
-        mn->calc_marginal_parameters();
+        // mn->calc_marginal_parameters();
         iw->calc_posterior_parameters();
     }
 
@@ -60,8 +136,7 @@ struct mn_iw_model_ : public model_base
     void set_likelihood_pars(arma::mat *data_mean_, arma::mat *cov_chol_)
     {
         mn->set_likelihood_pars(data_mean_, cov_chol_);
-        iw->set_likelihood_pars(mn->get_marginal_mean_ptr(),
-                                mn->get_marginal_cov_chol_ptr());
+        iw->set_likelihood_pars(data_mean_, cov_chol_);
     };
 
     // Getters
