@@ -6,18 +6,18 @@
 
 struct imc_gp : public gp_base
 {
-    uint dim_inp; // Input dimension
-    uint dim_out; // Output dimension
+    arma::uword dim_inp; // Input dimension
+    arma::uword dim_out; // Output dimension
 
     arma::mat train_dat; // (dim_inp × n_train)
-    uint n_training;
+    arma::uword n_training;
     arma::mat predictor_proxy;
 
     arma::mat test_dat; // (dim_inp × n_test)
-    uint n_test;
+    arma::uword n_test;
 
     arma::mat outcome_dat; // (dim_out x n_train)
-    uint n_outcome;
+    arma::uword n_outcome;
 
     arma::mat gp_val; // (dim_out x n_train)
 

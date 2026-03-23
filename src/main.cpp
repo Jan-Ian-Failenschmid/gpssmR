@@ -24,14 +24,14 @@ using namespace Rcpp;
 // [[Rcpp::export]]
 arma::mat gpssm_sample(
 
-    const uint &n_iter,     // Number of MCMC samples to be drawn
-    const uint &n_warm_up,  // Number of warm up samples to be drawn
-    const uint &n_thin,     //  Prethinning during sampling
-    const int &n_particles, // Number of particles
+    const arma::uword &n_iter,      // Number of MCMC samples to be drawn
+    const arma::uword &n_warm_up,   // Number of warm up samples to be drawn
+    const arma::uword &n_thin,      //  Prethinning during sampling
+    const arma::uword &n_particles, // Number of particles
 
-    const uint &n_time,              // Number of time-points
-    const int &d_lat,                // Number of time-points
-    const int &d_obs,                // Number of time-points
+    const arma::uword &n_time,       // Number of time-points
+    const arma::uword &d_lat,        // Number of time-points
+    const arma::uword &d_obs,        // Number of time-points
     arma::mat y,                     // Observation matrix y
     arma::mat x,                     // Latent variable initialization
     const arma::mat &covariate_dyn,  // Observation matrix y
@@ -45,38 +45,31 @@ arma::mat gpssm_sample(
     const Rcpp::Function &dprior,     // Hyperparameter log prior
     const Rcpp::Function &rprior,     // Hyperparameter rng
 
-    const arma::mat dyn_design_mat_const,  // Internal matrix constraint
     arma::mat dyn_design_mat_mean,         // Internal matrix mean
-    const arma::mat dyn_covar_mat_const,   // Covariate matrix mean
     const arma::mat dyn_covar_mat_mean,    // Covariate matrix mean
     const arma::mat dyn_covar_mat_col_cov, // Covariate matrix covariance
-    const uint &dyn_cov_df,                // Prior df dyn_cov
+    const arma::uword &dyn_cov_df,         // Prior df dyn_cov
     const arma::mat &dyn_cov_scale,        // Prior scale dyn_cov
 
     const arma::mat meas_design_mat_const,    // Internal matrix constraint
-    const arma::mat meas_design_mat_mean,     // Internal matrix mean
-    const arma::mat meas_design_mat_col_cov,  // Internal matrix covariance
     const arma::vec meas_design_mat_mean_alt, // Alternative prior formulation
     const arma::mat meas_design_mat_cov_alt,  // Alternative prior formulation
     const arma::mat meas_covar_mat_const,     // Covariate matrix mean
-    const arma::mat meas_covar_mat_mean,      // Covariate matrix mean
-    const arma::mat meas_covar_mat_col_cov,   // Covariate matrix covariance
     const arma::vec meas_covar_mat_mean_alt,  // Alternative prior formulation
     const arma::mat meas_covar_mat_cov_alt,   // Alternative prior formulation
-    const uint &meas_cov_df,                  // Prior df dyn_cov
+    const arma::uword &meas_cov_df,           // Prior df dyn_cov
     const arma::mat &meas_cov_scale,          // Prior scale dyn_cov
-    const bool uses_alt,                      // Alternative priors
 
-    const uint &mh_rep,
-    const uint &pg_rep,
+    const arma::uword &mh_rep,
+    const arma::uword &pg_rep,
 
-    const uint mh_adapt_start,
+    const arma::uword mh_adapt_start,
     bool exact = false,
     bool post_pred = false,
     bool disp_prog = true)
 {
     // Total iterations
-    uint n_total = (n_iter + n_warm_up) * n_thin;
+    arma::uword n_total = (n_iter + n_warm_up) * n_thin;
     timer.reset();
 
     // ---------------------------------
@@ -134,7 +127,6 @@ arma::mat gpssm_sample(
     gp->set_hyperparameters(
         std::exp(hyperparameters[0]), std::exp(hyperparameters[1]));
     gp->update_predictor(x_pred);
-
     arma::mat dyn_covar_mat_cov_chol = chol(dyn_covar_mat_col_cov, "lower");
     arma::mat dyn_cov_scale_chol = chol(dyn_cov_scale, "lower");
     dyn_design_mat_mean.zeros();
@@ -162,8 +154,8 @@ arma::mat gpssm_sample(
 
     // Lambda functions
     arma::vec par_vec;
-    uint par_size;
-    uint pos = 0;
+    arma::uword par_size;
+    arma::uword pos = 0;
     auto append = [&](const auto &v)
     {
         if (!v.n_elem)
@@ -182,10 +174,9 @@ arma::mat gpssm_sample(
     // Set initial parameter values -------
     dyn_model.calc_posterior_parameters();
     dyn_model.sample_posterior();
-
     // meas_model.set_data(meas_data, meas_data_mean);
     meas_model.sample_prior();
-    for (size_t i = 0; i < 1000; i++)
+    for (arma::uword i = 0; i < 1000; i++)
     {
         meas_model.calc_posterior_parameters();
         meas_model.sample_posterior();
@@ -222,7 +213,6 @@ arma::mat gpssm_sample(
     //         );
     //     }
     // }
-
     run_sim_latent(
         x, covariate_dyn,
         *gp, dyn_model, dyn_model_wrapper,
@@ -233,16 +223,16 @@ arma::mat gpssm_sample(
     x_pred = x.cols(sp_pred);
     update_model_predictor(x_pred, *gp, dyn_model, dyn_model_wrapper);
     meas_model_wrapper.combine_data();
-
     // Initialize temparary and output matreces
     arma::mat gp_sample(d_lat, n_time - 1);
     arma::mat y_post_pred(d_obs, n_time);
     arma::mat samples;
+    double log_lik;
     timer.toc("setup");
     // ---------------------------------
     // MCMC Sampling loop
     // ---------------------------------
-    for (size_t k = 0; k < n_total; k++)
+    for (arma::uword k = 0; k < n_total; k++)
     {
 
         // Increment progress bar
@@ -306,7 +296,6 @@ arma::mat gpssm_sample(
             t0_mean, t0_cov,
             pg_rep);
         timer.tic("pgas_outer");
-
         x_out = x.cols(sp_out);
         x_pred = x.cols(sp_pred);
         update_model_predictor(x_pred, *gp, dyn_model, dyn_model_wrapper);
@@ -340,7 +329,7 @@ arma::mat gpssm_sample(
 
         // MH - step
         rw_mh.advance_iter();
-        for (size_t i = 0; i < mh_rep; i++)
+        for (arma::uword i = 0; i < mh_rep; i++)
         {
             timer.tic("mh.make_prop");
             rw_mh.make_proposal(); // Make proposal
@@ -391,6 +380,11 @@ arma::mat gpssm_sample(
         y_post_pred += chol(meas_model.get_cov(), "lower") *
                        arma::randn(d_obs, n_time, arma::distr_param(0.0, 1.0));
 
+        log_lik = arma::sum(mat_logdnorm(y,
+                                         arma::mat(meas_model.get_param() * meas_model_wrapper.combined_data),
+                                         arma::chol(
+                                             meas_model.get_cov(), "lower")));
+
         // ---------------------------------
         // Save samples to output
         // ---------------------------------
@@ -411,7 +405,7 @@ arma::mat gpssm_sample(
             par_size += meas_model_wrapper.get_pred_param().n_elem;
             par_size += meas_model_wrapper.get_covar_param().n_elem;
             par_size += meas_model.get_cov().n_elem;
-
+            par_size += 1;
             par_vec.set_size(par_size);
             samples.set_size(n_total / n_thin, par_size);
         }
@@ -433,7 +427,8 @@ arma::mat gpssm_sample(
             append(meas_model_wrapper.get_pred_param());
             append(meas_model_wrapper.get_covar_param());
             append(meas_model.get_cov());
-
+            append(arma::vec(1).fill(log_lik));
+            
             // Store in samples matrix
             samples.row(k / n_thin) = par_vec.t();
         }
@@ -447,11 +442,11 @@ arma::mat gpssm_sample(
 // [[Rcpp::export]]
 arma::mat gpssm_prior_sample(
 
-    const uint &n_iter, // Number of MCMC samples to be drawn
+    const arma::uword &n_iter, // Number of MCMC samples to be drawn
 
-    const int &n_time, // Number of time-points
-    const int &d_lat,  // Number of time-points
-    const int &d_obs,  // Number of time-points
+    const arma::uword &n_time, // Number of time-points
+    const arma::uword &d_lat,  // Number of time-points
+    const arma::uword &d_obs,  // Number of time-points
 
     const arma::mat &covariate_dyn,  // Observation matrix y
     const arma::mat &covariate_meas, // Observation matrix y
@@ -463,27 +458,20 @@ arma::mat gpssm_prior_sample(
     const arma::vec &boundry_factor,  // Boundry factor
     const Rcpp::Function &rprior,     // Hyperparameter rng
 
-    const arma::mat dyn_design_mat_const,  // Internal matrix constraint
-    arma::mat dyn_design_mat_mean,   // Internal matrix mean
-    const arma::mat dyn_covar_mat_const,   // Covariate matrix mean
+    arma::mat dyn_design_mat_mean,         // Internal matrix mean
     const arma::mat dyn_covar_mat_mean,    // Covariate matrix mean
     const arma::mat dyn_covar_mat_col_cov, // Covariate matrix covariance
-    const uint &dyn_cov_df,                // Prior df dyn_cov
+    const arma::uword &dyn_cov_df,         // Prior df dyn_cov
     const arma::mat &dyn_cov_scale,        // Prior scale dyn_cov
 
     const arma::mat meas_design_mat_const,    // Internal matrix constraint
-    const arma::mat meas_design_mat_mean,     // Internal matrix mean
-    const arma::mat meas_design_mat_col_cov,  // Internal matrix covariance
     const arma::vec meas_design_mat_mean_alt, // Alternative prior formulation
     const arma::mat meas_design_mat_cov_alt,  // Alternative prior formulation
     const arma::mat meas_covar_mat_const,     // Covariate matrix mean
-    const arma::mat meas_covar_mat_mean,      // Covariate matrix mean
-    const arma::mat meas_covar_mat_col_cov,   // Covariate matrix covariance
     const arma::vec meas_covar_mat_mean_alt,  // Alternative prior formulation
     const arma::mat meas_covar_mat_cov_alt,   // Alternative prior formulation
-    const uint &meas_cov_df,                  // Prior df dyn_cov
+    const arma::uword &meas_cov_df,           // Prior df dyn_cov
     const arma::mat &meas_cov_scale,          // Prior scale dyn_cov
-    const bool uses_alt,                      // Alternative priors
 
     const arma::mat &y,
     bool exact = false,
@@ -501,7 +489,6 @@ arma::mat gpssm_prior_sample(
     // ---------------------------------
     // Set-up
     // ---------------------------------
-
     // Initialize hyperparamters
     arma::vec hyperparameters(2);
     hyperparameters = Rcpp::as<arma::vec>(rprior());
@@ -554,7 +541,6 @@ arma::mat gpssm_prior_sample(
     arma::mat dyn_covar_mat_cov_chol = chol(dyn_covar_mat_col_cov, "lower");
     arma::mat dyn_cov_scale_chol = chol(dyn_cov_scale, "lower");
     dyn_design_mat_mean.zeros();
-
     mn_covar_wrapper dyn_model_wrapper(
         gp->get_predictor_ptr(), &covariate_pred,
         &dyn_design_mat_mean, &dyn_covar_mat_mean,
@@ -569,7 +555,7 @@ arma::mat gpssm_prior_sample(
         meas_cov_df);
 
     mn_iw_model_ dyn_model = init_mn_iw_model(
-        y_proxy,
+        x_out,
         x_mean,
         x_cov_chol,
         dyn_model_wrapper,
@@ -578,8 +564,8 @@ arma::mat gpssm_prior_sample(
 
     // Lambda functions
     arma::vec par_vec;
-    uint par_size;
-    uint pos = 0;
+    arma::uword par_size;
+    arma::uword pos = 0;
     auto append = [&](const auto &v)
     {
         if (!v.n_elem)
@@ -595,8 +581,7 @@ arma::mat gpssm_prior_sample(
     arma::mat y_pred(d_obs, n_time);
     arma::mat gp_sample(d_lat, n_time - 1);
     double log_lik;
-
-    for (size_t k = 0; k < n_iter; k++)
+    for (arma::uword k = 0; k < n_iter; k++)
     {
         // Increment progress bar
         if (Progress::check_abort())
@@ -626,15 +611,14 @@ arma::mat gpssm_prior_sample(
         covariate_ceof_temp = dyn_model_wrapper.get_covar_param();
         // For the exact model - save the covariate sample and draw a new
         // GP model with a prior that conditions on x_pred.
-        // So that covariate_ceof_temp is fixed from when x was sampled 
-        // and the GP is marginalized when X was sampled and 
+        // So that covariate_ceof_temp is fixed from when x was sampled
+        // and the GP is marginalized when X was sampled and
         // and sampled afterwards
         if (exact)
         {
             update_model_predictor(x_pred, *gp, dyn_model, dyn_model_wrapper);
             dyn_model.sample_prior();
         }
-
         // Sample derived properties
         meas_model_wrapper.combine_data();
         y_pred = meas_model.get_param() * meas_model_wrapper.combined_data;
@@ -654,7 +638,8 @@ arma::mat gpssm_prior_sample(
         {
             log_lik = arma::sum(mat_logdnorm(y_pred,
                                              arma::mat(
-                                                 arma::mat(meas_model.get_param() * meas_model_wrapper.combined_data)),
+                                                 arma::mat(
+                                                     meas_model.get_param() * meas_model_wrapper.combined_data)),
                                              arma::chol(
                                                  meas_model.get_cov(), "lower")));
         }

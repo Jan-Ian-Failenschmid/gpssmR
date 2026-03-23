@@ -14,7 +14,7 @@ inline void softmax(RowType &&log_weights)
 
 inline arma::urowvec systematic_resampling(
     const arma::rowvec &w, // Vector of normalized resampling weights
-    const int &N           // Size of resampled vector
+    const arma::uword &N   // Size of resampled vector
 )
 {
     // Systematic resampling algorithm
@@ -29,7 +29,7 @@ inline arma::urowvec systematic_resampling(
     double q = 0.0; // Cumulative sum of weights
     int n = 0;      // Current index
 
-    for (size_t i = 0; i < N; i++)
+    for (arma::uword i = 0; i < N; i++)
     {
         while (q < u)
         {
@@ -48,9 +48,9 @@ inline std::vector<T> resample_std_vector(const std::vector<T> &data,
                                          const arma::uvec &indices)
 {
     std::vector<T> result;
-    uint n_resamples = indices.size();
+    arma::uword n_resamples = indices.size();
     result.reserve(n_resamples);
-    for (size_t i = 0; i < n_resamples; i++)
+    for (arma::uword i = 0; i < n_resamples; i++)
     {
         result.push_back(data[indices[i]]);
     }

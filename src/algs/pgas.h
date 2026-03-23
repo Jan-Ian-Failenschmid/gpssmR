@@ -14,9 +14,9 @@ arma::mat pgas(
     const arma::mat &y,
     const arma::mat &covariate_dyn,
     const arma::mat &covariate_meas,
-    const int &n_particles,
-    const int &n_time,
-    const int &d_lat,
+    const arma::uword &n_particles,
+    const arma::uword &n_time,
+    const arma::uword &d_lat,
     hsgp_approx &hsgp,
     const arma::mat &x_ref,
     const arma::vec &t0_mean,
@@ -33,9 +33,9 @@ arma::mat pgas(
     const arma::mat &y,
     const arma::mat &covariate_dyn,
     const arma::mat &covariate_meas,
-    const int &n_particles,
-    const int &n_time,
-    const int &d_lat,
+    const arma::uword &n_particles,
+    const arma::uword &n_time,
+    const arma::uword &d_lat,
     imc_gp &gp,
     const arma::mat &x_ref,
     const arma::vec &t0_mean,
@@ -44,8 +44,7 @@ arma::mat pgas(
     const arma::mat &dyn_cov,
     const arma::mat &des_mat,
     const arma::mat &meas_covar,
-    const arma::mat &meas_cov
-);
+    const arma::mat &meas_cov);
 
 // Measurement model
 arma::mat meas_model(

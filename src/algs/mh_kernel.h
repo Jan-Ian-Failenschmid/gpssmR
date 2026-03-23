@@ -24,8 +24,8 @@ struct mh_kernel
     arma::mat prop_cov;
     arma::mat prop_cov_chol;
 
-    uint iter;
-    uint d_par;
+    arma::uword iter;
+    arma::uword d_par;
     double epsilon;
 
     // Adapting
@@ -35,9 +35,9 @@ struct mh_kernel
     double log_eps_bar;
 
     double init_epsilon;
-    uint warm_up;
-    uint adapt_start;
-    uint t0;
+    arma::uword warm_up;
+    arma::uword adapt_start;
+    arma::uword t0;
     double gamma;
     double kappa;
 
@@ -46,8 +46,8 @@ struct mh_kernel
     mh_kernel(
         arma::vec par_inp,         // Parameter vector input
         Rcpp::Function dprior_inp, // Prior liklihood
-        const uint &warm_up_inp,
-        const uint &adapt_start_inp);
+        const arma::uword &warm_up_inp,
+        const arma::uword &adapt_start_inp);
 
     void advance_iter();
     void tune_proposal();

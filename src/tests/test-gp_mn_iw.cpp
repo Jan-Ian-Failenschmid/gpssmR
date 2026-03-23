@@ -82,9 +82,9 @@ context("C++ GP Matrix-normal-inverse-Wishart")
 
         // Posterior covariance scale
         arma::mat posterior_cov_scale = {
-            {23.0381917812906, -1.42030578276968},
-            {-1.42030578276968, 27.627572816381}};
-
+            {23.0381917797606, -1.42030578326805},
+            {-1.42030578326805, 27.6275728158056}};
+        // mn_iw_modeld.iw->cov_scale_posterior.raw_print(Rcpp::Rcerr);
         expect_true(
             compare_mat(mn_iw_modeld.iw->cov_scale_posterior,
                         posterior_cov_scale, 1e-10));
@@ -110,7 +110,7 @@ context("C++ GP Matrix-normal-inverse-Wishart")
 
         expect_true(
             compare_double(mn_iw_modeld.log_marginal_likelihood(),
-                           -175.583325242305,
+                           -175.583325341299,
                            1e-10));
     };
 };

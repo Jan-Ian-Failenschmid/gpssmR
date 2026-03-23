@@ -25,10 +25,10 @@ void hsgp_approx::update_hyperparameters(
 
 void hsgp_approx::phi_transform(const arma::mat &x)
 {
-    uint n_phi = sqrt_lambda.n_rows;
+    arma::uword n_phi = sqrt_lambda.n_rows;
     phi.set_size(n_phi, x.n_cols);
 
-    for (size_t i = 0; i < n_phi; i++)
+    for (arma::uword i = 0; i < n_phi; i++)
     {
         phi.row(i) = gp_phi_nD(boundry_factor, sqrt_lambda.row(i).t(), x);
     }

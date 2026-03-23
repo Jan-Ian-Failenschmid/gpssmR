@@ -169,11 +169,11 @@ inline void chol_rank_one_update(
     double c,
     arma::vec x)
 {
-    uint n = x.n_elem;
+    arma::uword n = x.n_elem;
 
     double ljj, ljj2, xj, xj2, ljj_new, gamma;
     double b = 1.0;
-    for (size_t j = 0; j < n; j++) // Iterate over columns
+    for (arma::uword j = 0; j < n; j++) // Iterate over columns
     {
         ljj = L(j, j);
         ljj2 = ljj * ljj;
@@ -183,7 +183,7 @@ inline void chol_rank_one_update(
         ljj_new = std::sqrt(ljj2 + c / b * xj2); // New diagonal element
         L(j, j) = ljj_new;
         gamma = ljj2 * b + c * xj2;
-        for (size_t i = (j + 1); i < n; i++) // Iterate over rows under diagonal
+        for (arma::uword i = (j + 1); i < n; i++) // Iterate over rows under diagonal
         {
             x(i) -= (xj / ljj) * L(i, j);
             L(i, j) = (ljj_new / ljj) * L(i, j) + (ljj_new * c * xj / gamma) * x(i);
@@ -202,7 +202,7 @@ inline arma::mat chol_rank_n_update(
     double c,
     arma::mat X)
 {
-    for (size_t i = 0; i < X.n_cols; i++)
+    for (arma::uword i = 0; i < X.n_cols; i++)
     {
         chol_rank_one_update(L, c, X.col(i));
     }
@@ -214,7 +214,7 @@ inline void chol_rank_n_update_ip(
     double c,
     const arma::mat &X)
 {
-    for (size_t i = 0; i < X.n_cols; i++)
+    for (arma::uword i = 0; i < X.n_cols; i++)
     {
         chol_rank_one_update(L, c, X.col(i));
     }

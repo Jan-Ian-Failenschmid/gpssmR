@@ -234,7 +234,6 @@ struct iw_model_conjugate : public model_base
 
     void calc_posterior_parameters() override
     {
-
         // Sufficient Statistics
         diff = *outcome - *data_mean;
         if (identity_data_cov)
@@ -376,8 +375,9 @@ struct mn_regression_model : public model_base, public regression_base
 
     void calc_posterior_parameters() override
     {
-        // Sufficient statistics
+        // Sufficient statistic
         arma::mat Z;
+
         arma::mat resid = *outcome - *data_mean;
         if (identity_data_cov)
         {
@@ -394,15 +394,15 @@ struct mn_regression_model : public model_base, public regression_base
         // Posterior parameters
         // Invert kxk if k < n and nxn otherwise.
         col_cov_posterior_inv = sigma + col_cov_prior_inv;
-        if (col_cov_prior.n_cols <= data_cov.n_cols)
-        {
+        // if (col_cov_prior.n_cols <= data_cov.n_cols)
+        // {
             col_cov_posterior = arma::inv_sympd(col_cov_posterior_inv);
-        }
-        else
-        {
-            col_cov_posterior = woodbury_inv(
-                col_cov_prior, *predictor, data_cov);
-        }
+        // }
+        // else
+        // {
+        //     col_cov_posterior = woodbury_inv(
+        //         col_cov_prior, *predictor, data_cov);
+        // }
 
         make_symmetric(col_cov_posterior);
 

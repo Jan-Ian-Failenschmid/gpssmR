@@ -97,6 +97,114 @@ gpssm_design_mat <- R6::R6Class("gpssm_design_mat",
   )
 )
 
+gpssm_mn_prior <- R6::R6Class("gpssm_mn_prior",
+  private = list(
+    dim = NULL,
+    par_vec = NULL,
+    par_names = NULL
+  ),
+  public = list(
+    name = NULL,
+    value = NULL,
+    prior_mean = NULL,
+    prior_col_cov = NULL,
+    initialize = function(name, prior_mean = NULL, prior_col_cov = NULL) {
+      stopifnot(is.character(name), length(name) == 1, nchar(name) > 0)
+      stopifnot(is.matrix(prior_mean), is.matrix(prior_col_cov))
+
+      self$prior_mean <- prior_mean
+      self$prior_col_cov <- prior_col_cov
+      self$name <- name
+
+      private$dim <- dim(prior_mean)
+      self$value <- prior_mean
+      private$par_vec <- as.vector(self$value)
+
+      idx <- expand.grid(
+        row = seq_len(private$dim[1]),
+        col = seq_len(private$dim[2])
+      )
+
+      private$par_names <- apply(
+        idx, 1,
+        function(x) paste0(name, "[", x[1], ",", x[2], "]")
+      )
+    },
+    get_dim = function() {
+      private$dim
+    },
+    get_par_vec = function() {
+      private$par_vec
+    },
+    get_par_names = function() {
+      private$par_names
+    }
+  )
+)
+
+gpssm_mvn_prior <- R6::R6Class("gpssm_mvn_prior",
+  private = list(
+    dim = NULL,
+    par_vec = NULL,
+    par_names = NULL,
+    alt = FALSE
+  ),
+  public = list(
+    name = NULL,
+    value = NULL,
+    constraint = NULL,
+
+    ## alternative formulation
+    prior_mean = NULL,
+    prior_cov = NULL,
+    initialize = function(name,
+                          constraint,
+                          prior_mean = NULL,
+                          prior_cov = NULL) {
+      stopifnot(is.character(name), length(name) == 1, nchar(name) > 0)
+      stopifnot(is.matrix(constraint))
+      stopifnot(is.vector(prior_mean), is.matrix(prior_cov))
+
+      n_free <- sum(is.na(constraint))
+
+      stopifnot(
+        length(prior_mean) == n_free,
+        nrow(prior_cov) == n_free,
+        ncol(prior_cov) == n_free
+      )
+
+      self$prior_mean <- prior_mean
+      self$prior_cov <- prior_cov
+
+      self$name <- name
+      self$constraint <- constraint
+
+      private$dim <- dim(constraint)
+      self$value <- vec2mat(prior_mean, constraint)
+      private$par_vec <- as.vector(self$value)
+
+      idx <- expand.grid(
+        row = seq_len(private$dim[1]),
+        col = seq_len(private$dim[2])
+      )
+
+      private$par_names <- apply(
+        idx, 1,
+        function(x) paste0(name, "[", x[1], ",", x[2], "]")
+      )
+    },
+    get_dim = function() {
+      private$dim
+    },
+    get_par_vec = function() {
+      private$par_vec
+    },
+    get_par_names = function() {
+      private$par_names
+    }
+  )
+)
+
 # gpssm_design_mat$new(
 #   name = "B",
 #   constraint = matrix(NA, 1, M_basis),
@@ -392,27 +500,19 @@ gpssm <- R6::R6Class("gpssm",
               basis_fun_index = self$basis_fun_index,
               boundry_factor = self$boundry_factor,
               rprior = self$rprior,
-              dyn_design_mat_const = self$dyn_design_mat$constraint,
               dyn_design_mat_mean = self$dyn_design_mat$prior_mean,
-              dyn_covar_mat_const = self$dyn_covariate_mat$constraint,
               dyn_covar_mat_mean = self$dyn_covariate_mat$prior_mean,
               dyn_covar_mat_col_cov = self$dyn_covariate_mat$prior_col_cov,
               dyn_cov_df = self$dyn_cov_mat$prior_df,
               dyn_cov_scale = self$dyn_cov_mat$prior_scale,
               meas_design_mat_const = self$meas_design_mat$constraint,
-              meas_design_mat_mean = self$meas_design_mat$prior_mean,
-              meas_design_mat_col_cov = self$meas_design_mat$prior_col_cov,
-              meas_design_mat_mean_alt = self$meas_design_mat$prior_mean_alt,
-              meas_design_mat_cov_alt = self$meas_design_mat$prior_cov_alt,
+              meas_design_mat_mean_alt = self$meas_design_mat$prior_mean,
+              meas_design_mat_cov_alt = self$meas_design_mat$prior_cov,
               meas_covar_mat_const = self$meas_covariate_mat$constraint,
-              meas_covar_mat_mean = self$meas_covariate_mat$prior_mean,
-              meas_covar_mat_col_cov = self$meas_covariate_mat$prior_col_cov,
-              meas_covar_mat_mean_alt = self$meas_covariate_mat$prior_mean_alt,
-              meas_covar_mat_cov_alt = self$meas_covariate_mat$prior_cov_alt,
+              meas_covar_mat_mean_alt = self$meas_covariate_mat$prior_mean,
+              meas_covar_mat_cov_alt = self$meas_covariate_mat$prior_cov,
               meas_cov_df = self$meas_cov_mat$prior_df,
               meas_cov_scale = self$meas_cov_mat$prior_scale,
-              uses_alt = self$meas_design_mat$uses_alt_prior() &
-                self$meas_covariate_mat$uses_alt_prior(),
               y = y_test,
               exact = exact,
               pred = pred,
@@ -437,12 +537,12 @@ gpssm <- R6::R6Class("gpssm",
           }
         )
       } else if (parallel == "future") {
-        if (!require(future)) {
-          stop("'future' required for parallel sampling. Please install 'future' or choose the option parallel = 'off'")
+        if (!require(future.apply)) {
+          stop("'future.apply' required for parallel sampling. Please install 'future' or choose the option parallel = 'off'")
         }
         self_local <- self # Local copy os self to be exported to workers
         # Run parallel chains
-        samples <- future_lapply(1:chains,
+        samples <- future.apply::future_lapply(1:chains,
           future.seed = seed,
           future.globals = list(
             self_local = self_local,
@@ -461,27 +561,19 @@ gpssm <- R6::R6Class("gpssm",
               basis_fun_index = self$basis_fun_index,
               boundry_factor = self$boundry_factor,
               rprior = self$rprior,
-              dyn_design_mat_const = self$dyn_design_mat$constraint,
               dyn_design_mat_mean = self$dyn_design_mat$prior_mean,
-              dyn_covar_mat_const = self$dyn_covariate_mat$constraint,
               dyn_covar_mat_mean = self$dyn_covariate_mat$prior_mean,
               dyn_covar_mat_col_cov = self$dyn_covariate_mat$prior_col_cov,
               dyn_cov_df = self$dyn_cov_mat$prior_df,
               dyn_cov_scale = self$dyn_cov_mat$prior_scale,
               meas_design_mat_const = self$meas_design_mat$constraint,
-              meas_design_mat_mean = self$meas_design_mat$prior_mean,
-              meas_design_mat_col_cov = self$meas_design_mat$prior_col_cov,
-              meas_design_mat_mean_alt = self$meas_design_mat$prior_mean_alt,
-              meas_design_mat_cov_alt = self$meas_design_mat$prior_cov_alt,
+              meas_design_mat_mean_alt = self$meas_design_mat$prior_mean,
+              meas_design_mat_cov_alt = self$meas_design_mat$prior_cov,
               meas_covar_mat_const = self$meas_covariate_mat$constraint,
-              meas_covar_mat_mean = self$meas_covariate_mat$prior_mean,
-              meas_covar_mat_col_cov = self$meas_covariate_mat$prior_col_cov,
-              meas_covar_mat_mean_alt = self$meas_covariate_mat$prior_mean_alt,
-              meas_covar_mat_cov_alt = self$meas_covariate_mat$prior_cov_alt,
+              meas_covar_mat_mean_alt = self$meas_covariate_mat$prior_mean,
+              meas_covar_mat_cov_alt = self$meas_covariate_mat$prior_cov,
               meas_cov_df = self$meas_cov_mat$prior_df,
               meas_cov_scale = self$meas_cov_mat$prior_scale,
-              uses_alt = self$meas_design_mat$uses_alt_prior() &
-                self$meas_covariate_mat$uses_alt_prior(),
               y = y_test,
               exact = exact,
               pred = pred,
@@ -544,34 +636,26 @@ gpssm <- R6::R6Class("gpssm",
               y = self$data$data,
               x = latent_start_i,
               covariate_dyn = self$data$covariate_dyn,
-              covariate = self$data$covariate_meas,
+              covariate_meas = self$data$covariate_meas,
               t0_mean = self$data$t0_mean,
               t0_cov = self$data$t0_cov,
               basis_fun_index = self$basis_fun_index,
               boundry_factor = self$boundry_factor,
               dprior = self$dprior,
               rprior = self$rprior,
-              dyn_design_mat_const = self$dyn_design_mat$constraint,
               dyn_design_mat_mean = self$dyn_design_mat$prior_mean,
-              dyn_covar_mat_const = self$dyn_covariate_mat$constraint,
               dyn_covar_mat_mean = self$dyn_covariate_mat$prior_mean,
               dyn_covar_mat_col_cov = self$dyn_covariate_mat$prior_col_cov,
               dyn_cov_df = self$dyn_cov_mat$prior_df,
               dyn_cov_scale = self$dyn_cov_mat$prior_scale,
               meas_design_mat_const = self$meas_design_mat$constraint,
-              meas_design_mat_mean = self$meas_design_mat$prior_mean,
-              meas_design_mat_col_cov = self$meas_design_mat$prior_col_cov,
-              meas_design_mat_mean_alt = self$meas_design_mat$prior_mean_alt,
-              meas_design_mat_cov_alt = self$meas_design_mat$prior_cov_alt,
+              meas_design_mat_mean_alt = self$meas_design_mat$prior_mean,
+              meas_design_mat_cov_alt = self$meas_design_mat$prior_cov,
               meas_covar_mat_const = self$meas_covariate_mat$constraint,
-              meas_covar_mat_mean = self$meas_covariate_mat$prior_mean,
-              meas_covar_mat_col_cov = self$meas_covariate_mat$prior_col_cov,
-              meas_covar_mat_mean_alt = self$meas_covariate_mat$prior_mean_alt,
-              meas_covar_mat_cov_alt = self$meas_covariate_mat$prior_cov_alt,
+              meas_covar_mat_mean_alt = self$meas_covariate_mat$prior_mean,
+              meas_covar_mat_cov_alt = self$meas_covariate_mat$prior_cov,
               meas_cov_df = self$meas_cov_mat$prior_df,
               meas_cov_scale = self$meas_cov_mat$prior_scale,
-              uses_alt = self$meas_design_mat$uses_alt_prior() &
-                self$meas_covariate_mat$uses_alt_prior(),
               mh_rep = mh_rep,
               pg_rep = pg_rep,
               mh_adapt_start = mh_adapt_start,
@@ -579,6 +663,7 @@ gpssm <- R6::R6Class("gpssm",
               post_pred = post_pred,
               disp_prog = disp_prog
             )
+
 
             # Assign column names
             name_parts <- c(
@@ -591,7 +676,8 @@ gpssm <- R6::R6Class("gpssm",
               self$dyn_cov_mat$get_par_names(),
               self$meas_design_mat$get_par_names(),
               self$meas_covariate_mat$get_par_names(),
-              self$meas_cov_mat$get_par_names()
+              self$meas_cov_mat$get_par_names(), 
+              "log_lik"
             )
             colnames(chain_sample) <- name_parts
 
@@ -599,12 +685,12 @@ gpssm <- R6::R6Class("gpssm",
           }
         )
       } else if (parallel == "future") {
-        if (!require(future)) {
-          stop("'future' required for parallel sampling. Please install 'future' or choose the option parallel = 'off'")
+        if (!require(future.apply)) {
+          stop("'future.apply' required for parallel sampling. Please install 'future' or choose the option parallel = 'off'")
         }
         self_local <- self # Local copy os self to be exported to workers
         # Run parallel chains
-        samples <- future_lapply(1:chains,
+        samples <- future.apply::future_lapply(1:chains,
           future.seed = seed,
           future.globals = list(
             self_local = self_local,
@@ -634,27 +720,19 @@ gpssm <- R6::R6Class("gpssm",
               boundry_factor = self$boundry_factor,
               dprior = self$dprior,
               rprior = self$rprior,
-              dyn_design_mat_const = self$dyn_design_mat$constraint,
               dyn_design_mat_mean = self$dyn_design_mat$prior_mean,
-              dyn_covar_mat_const = self$dyn_covariate_mat$constraint,
               dyn_covar_mat_mean = self$dyn_covariate_mat$prior_mean,
               dyn_covar_mat_col_cov = self$dyn_covariate_mat$prior_col_cov,
               dyn_cov_df = self$dyn_cov_mat$prior_df,
               dyn_cov_scale = self$dyn_cov_mat$prior_scale,
               meas_design_mat_const = self$meas_design_mat$constraint,
-              meas_design_mat_mean = self$meas_design_mat$prior_mean,
-              meas_design_mat_col_cov = self$meas_design_mat$prior_col_cov,
-              meas_design_mat_mean_alt = self$meas_design_mat$prior_mean_alt,
-              meas_design_mat_cov_alt = self$meas_design_mat$prior_cov_alt,
+              meas_design_mat_mean_alt = self$meas_design_mat$prior_mean,
+              meas_design_mat_cov_alt = self$meas_design_mat$prior_cov,
               meas_covar_mat_const = self$meas_covariate_mat$constraint,
-              meas_covar_mat_mean = self$meas_covariate_mat$prior_mean,
-              meas_covar_mat_col_cov = self$meas_covariate_mat$prior_col_cov,
-              meas_covar_mat_mean_alt = self$meas_covariate_mat$prior_mean_alt,
-              meas_covar_mat_cov_alt = self$meas_covariate_mat$prior_cov_alt,
+              meas_covar_mat_mean_alt = self$meas_covariate_mat$prior_mean,
+              meas_covar_mat_cov_alt = self$meas_covariate_mat$prior_cov,
               meas_cov_df = self$meas_cov_mat$prior_df,
               meas_cov_scale = self$meas_cov_mat$prior_scale,
-              uses_alt = self$meas_design_mat$uses_alt_prior() &
-                self$meas_covariate_mat$uses_alt_prior(),
               mh_rep = mh_rep,
               pg_rep = pg_rep,
               mh_adapt_start = mh_adapt_start,
@@ -674,7 +752,8 @@ gpssm <- R6::R6Class("gpssm",
               self$dyn_cov_mat$get_par_names(),
               self$meas_design_mat$get_par_names(),
               self$meas_covariate_mat$get_par_names(),
-              self$meas_cov_mat$get_par_names()
+              self$meas_cov_mat$get_par_names(), 
+              "log_lik"
             )
             colnames(chain_sample) <- name_parts
 
@@ -689,11 +768,18 @@ gpssm <- R6::R6Class("gpssm",
 
       return(invisible(self))
     },
-    plot_pred = function(
-        prior = FALSE,
-        latent_smooth = FALSE, ci = 0.95, true_latent = FALSE) {
+    get_samples = function(prior = FALSE) {
+      if (prior) {
+        self$prior_samples
+      } else {
+        self$posterior_samples
+      }
+    },
+    plot_pred = function(prior = FALSE,
+                         latent_smooth = FALSE, ci = 0.95,
+                         true_latent = FALSE) {
       if (!require(ggplot2)) {
-        stop("'gplot2' required for plotting.")
+        stop("'ggplot2' required for plotting.")
       }
 
       n_indicators <- self$data$get_d_obs()
@@ -704,12 +790,6 @@ gpssm <- R6::R6Class("gpssm",
       time_index <- seq_len(n_time)
 
       ## Access samples without coppying
-      get_samples <- if (prior) {
-        function() self$prior_samples
-      } else {
-        function() self$posterior_samples
-      }
-
       plot_df_all <- data.frame()
       obs_df_all <- data.frame()
       true_df_all <- data.frame()
@@ -717,10 +797,12 @@ gpssm <- R6::R6Class("gpssm",
       for (i in seq_len(n_indicators)) {
         ## ---- Indicator samples ----
         indicator_names <- paste0("^", data_name, "\\[", i, ",")
-        var_names <- grep(indicator_names, variables(get_samples()), value = TRUE)
+        var_names <- grep(indicator_names, 
+        posterior::variables(self$get_samples(prior)), 
+        value = TRUE)
 
-        samples_indicator <- as_draws_matrix(
-          subset(get_samples(), variable = var_names)
+        samples_indicator <- posterior::as_draws_matrix(
+          posterior::subset_draws(self$get_samples(prior), variable = var_names)
         )
 
         mean_vals <- colMeans(samples_indicator)
@@ -741,10 +823,13 @@ gpssm <- R6::R6Class("gpssm",
         ## Extract latent smooth if desired
         if (latent_smooth) {
           latent_names <- paste0("^", latent_name, "\\[", latent_smooth, ",")
-          var_names <- grep(latent_names, variables(get_samples()), value = TRUE)
+          var_names <- grep(latent_names, 
+          posterior::variables(self$get_samples(prior)), 
+          value = TRUE)
 
-          samples_latent <- as_draws_matrix(
-            subset(get_samples(), variable = var_names)
+          samples_latent <- posterior::as_draws_matrix(
+            posterior::subset_draws(self$get_samples(prior), 
+            variable = var_names)
           )
 
           latent_df <- data.frame(
@@ -785,22 +870,21 @@ gpssm <- R6::R6Class("gpssm",
       }
 
       ## Build ggplot
-      p <- ggplot()
+      p <- ggplot2::ggplot()
 
-      indicator_df <- subset(plot_df_all, type == "indicator")
+      indicator_df <- plot_df_all[plot_df_all$type == "indicator", ]
 
       p <- p +
-        geom_ribbon(
+        ggplot2::geom_ribbon(
           data = indicator_df,
           aes(x = time, ymin = lb, ymax = ub, fill = "Credible Interval"),
           alpha = 0.15
         )
 
       if (latent_smooth) {
-        latent_df <- subset(plot_df_all, type == "latent")
-
+        latent_df <- plot_df_all[plot_df_all$type == "latent", ]
         p <- p +
-          geom_ribbon(
+          ggplot2::geom_ribbon(
             data = latent_df,
             aes(x = time, ymin = lb, ymax = ub, fill = "Latent Smooth CI"),
             alpha = 0.25
@@ -808,12 +892,12 @@ gpssm <- R6::R6Class("gpssm",
       }
 
       p <- p +
-        geom_line(
+        ggplot2::geom_line(
           data = indicator_df,
           aes(x = time, y = mean, linetype = "Posterior Mean"),
           linewidth = 1
         ) +
-        geom_point(
+        ggplot2::geom_point(
           data = obs_df_all,
           aes(x = time, y = value, shape = "Observed Data"),
           size = 1.8
@@ -821,7 +905,7 @@ gpssm <- R6::R6Class("gpssm",
 
       if (!identical(true_latent, FALSE)) {
         p <- p +
-          geom_line(
+          ggplot2::geom_line(
             data = true_df_all,
             aes(x = time, y = value, linetype = "True Latent"),
             linewidth = 1
@@ -829,50 +913,70 @@ gpssm <- R6::R6Class("gpssm",
       }
 
       p <- p +
-        facet_wrap(~indicator, scales = "free_y") +
-        scale_fill_manual(
+        ggplot2::facet_wrap(~indicator, scales = "free_y") +
+        ggplot2::scale_fill_manual(
           name = "",
           values = c(
             "Credible Interval" = "#1B4F72",
             "Latent Smooth CI"  = "#1B4F72"
           )
         ) +
-        scale_linetype_manual(
+        ggplot2::scale_linetype_manual(
           name = "",
           values = c(
             "Posterior Mean" = "dashed",
             "True Latent" = "solid"
           )
         ) +
-        scale_shape_manual(
+        ggplot2::scale_shape_manual(
           name = "",
           values = c("Observed Data" = 16)
         ) +
-        labs(
+        ggplot2::labs(
           x = "Time",
           y = "Latent Variable",
           title = if (prior) "Prior Predictive" else "Posterior Predictive"
         ) +
-        theme_minimal(base_size = 14) +
-        theme(
+        ggplot2::theme_minimal(base_size = 14) +
+        ggplot2::theme(
           legend.position = "bottom",
           legend.box = "horizontal",
-          strip.text = element_text(size = 12, face = "bold"),
-          plot.title = element_text(size = 16, face = "bold"),
-          panel.grid.minor = element_blank()
+          strip.text = ggplot2::element_text(size = 12, face = "bold"),
+          plot.title = ggplot2::element_text(size = 16, face = "bold"),
+          axis.line = ggplot2::element_line(color = "black"),
+          axis.ticks = ggplot2::element_line(color = "black"),
+          panel.grid.minor = ggplot2::element_blank()
         )
 
       print(p)
+      return(p)
     }
   )
 )
 
 # Would probably be good to have these as seperate classes at some point !!!
 gpssm_gp <- function(
-    m_basis, c, S, dprior, rprior, hyperparameter_names,
-    gp_name = "gp") {
-  m_basis_list <- lapply(m_basis, function(x) 1:x)
-  basis_fun_index <- do.call(expand.grid, m_basis_list)
+    dprior, rprior, hyperparameter_names,
+    m_basis = NULL, c = NULL, S = NULL, gp_name = "gp") {
+  if (is.null(m_basis) & is.null(c) & is.null(S)) {
+    exact <- TRUE
+  } else if (!is.null(m_basis) & !is.null(c) & !is.null(S)) {
+    exact <- FALSE
+  } else {
+    stop("GP specification is not consistent. Please either provide
+     input for an exact or a Hilbert-space approximate GP.")
+  }
+
+  if (exact) {
+    m_basis_list <- lapply(m_basis, function(x) 0)
+    basis_fun_index <- do.call(expand.grid, m_basis_list)
+    c <- 0
+    S <- 0
+  } else {
+    m_basis_list <- lapply(m_basis, function(x) 1:x)
+    basis_fun_index <- do.call(expand.grid, m_basis_list)
+  }
+
   ## Wrap rprior() to log(rprior())
   rprior_tans <- function() {
     return(log(rprior()))
@@ -881,31 +985,48 @@ gpssm_gp <- function(
   dprior_trans <- function(log_pars) {
     return(dprior(exp(log_pars), log = TRUE) + sum(log_pars))
   }
+
   list(
     basis_fun_index = as.matrix(basis_fun_index),
     boundry_factor = c * S,
     hyperparameter_names = hyperparameter_names,
     gp_name = gp_name,
     dprior = dprior_trans,
-    rprior = rprior_tans
+    rprior = rprior_tans,
+    gp_exact = exact
   )
 }
 
 gpss_model_part <- function(design_mat, covariate_mat = NULL, cov_mat) {
   if (is.null(covariate_mat)) {
-    if (!design_mat$uses_alt_prior()) {
-      covariate_mat <- gpssm_design_mat$new(
-        name = paste0(design_mat$name, "_covar"),
-        constraint = matrix(numeric(0), nrow(design_mat$constraint), 0),
-        prior_mean = matrix(numeric(0), nrow(design_mat$constraint), 0),
+    if ("gpssm_design_mat" %in% class(design_mat)) {
+      if (!design_mat$uses_alt_prior()) {
+        covariate_mat <- gpssm_design_mat$new(
+          name = paste0(design_mat$name, "_covar"),
+          constraint = matrix(numeric(0), nrow(design_mat$constraint), 0),
+          prior_mean = matrix(numeric(0), nrow(design_mat$constraint), 0),
+          prior_col_cov = matrix(numeric(0), 0, 0)
+        )
+      } else {
+        covariate_mat <- gpssm_design_mat$new(
+          name = paste0(design_mat$name, "_covar"),
+          constraint = matrix(numeric(0), nrow(design_mat$constraint), 0),
+          prior_mean_alt = numeric(0),
+          prior_cov_alt = matrix(numeric(0), 0, 0)
+        )
+      }
+    } else if ("gpssm_mn_prior" %in% class(design_mat)) {
+      covariate_mat <- gpssm_mn_prior$new(
+        name = paste0(design_mat$name, "_covariate"),
+        prior_mean = matrix(numeric(0), nrow(design_mat$prior_mean), 0),
         prior_col_cov = matrix(numeric(0), 0, 0)
       )
-    } else {
-      covariate_mat <- gpssm_design_mat$new(
-        name = paste0(design_mat$name, "_covar"),
+    } else if ("gpssm_mvn_prior" %in% class(design_mat)) {
+      covariate_mat <- gpssm_mvn_prior$new(
+        name = paste0(design_mat$name, "_covariate"),
         constraint = matrix(numeric(0), nrow(design_mat$constraint), 0),
-        prior_mean_alt = numeric(0),
-        prior_cov_alt = matrix(numeric(0), 0, 0)
+        prior_mean = numeric(0),
+        prior_cov = matrix(numeric(0), 0, 0)
       )
     }
   }

@@ -7,8 +7,8 @@
 mh_kernel::mh_kernel(
     arma::vec par_inp,         // Parameter vector input
     Rcpp::Function dprior_inp, // Prior liklihood
-    const uint &warm_up_inp,
-    const uint &adapt_start_inp) : par(par_inp), R_par(par_inp.begin(),
+    const arma::uword &warm_up_inp,
+    const arma::uword &adapt_start_inp) : par(par_inp), R_par(par_inp.begin(),
                                                        par_inp.end()),
                                    R_prop_par(), dprior(dprior_inp),
                                    prop_cov_chol(),

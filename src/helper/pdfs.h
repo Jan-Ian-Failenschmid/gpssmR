@@ -195,11 +195,11 @@ inline double log_dmatrixt(
     const arma::mat &sigma_y_chol,
     const arma::mat &prior_cov_scale_chol,
     const arma::mat &post_cov_scale_chol,
-    uint v_prior,
-    uint v_post)
+    arma::uword v_prior,
+    arma::uword v_post)
 {
-    uint dy = prior_cov_scale_chol.n_cols;
-    uint n = v_post - v_prior;
+    arma::uword dy = prior_cov_scale_chol.n_cols;
+    arma::uword n = v_post - v_prior;
 
     double log_det_y = log_det_chol(sigma_y_chol);
     double log_det_prior_cov_scale = log_det_chol(prior_cov_scale_chol);
@@ -221,11 +221,11 @@ inline double log_dmatrixt(
     const arma::mat &posterior_col_chol,
     const arma::mat &prior_cov_scale_chol,
     const arma::mat &post_cov_scale_chol,
-    uint v_prior,
-    uint v_post)
+    arma::uword v_prior,
+    arma::uword v_post)
 {
-    uint dy = prior_cov_scale_chol.n_cols;
-    uint n = v_post - v_prior;
+    arma::uword dy = prior_cov_scale_chol.n_cols;
+    arma::uword n = v_post - v_prior;
 
     double log_det_prior_col = log_det_chol(prior_col_chol);
     double log_det_posterior_col = log_det_chol(posterior_col_chol);

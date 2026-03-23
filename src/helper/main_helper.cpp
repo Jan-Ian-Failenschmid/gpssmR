@@ -101,13 +101,13 @@ void run_sim_latent(
     const mn_covar_wrapper &dyn_wrapper,
     const arma::vec &t0_mean,
     const arma::mat &t0_cov,
-    uint pg_rep)
+    arma::uword pg_rep)
 {
     if (pg_rep == 0)
         return;
 
-    uint n_time = x.n_cols;
-    uint d_lat = x.n_rows;
+    arma::uword n_time = x.n_cols;
+    arma::uword d_lat = x.n_rows;
 
     if (auto *m = dynamic_cast<const imc_gp *>(&gp))
     {
@@ -145,7 +145,7 @@ void run_pgas(
     arma::mat &x,
     const arma::mat &covariate_dyn,
     const arma::mat &covariate_meas,
-    uint n_particles,
+    arma::uword n_particles,
     gp_base &gp,
     const mn_iw_model_ &dyn_model,
     const mn_covar_wrapper &dyn_wrapper,
@@ -153,12 +153,12 @@ void run_pgas(
     const mvn_covar_wrapper &meas_wrapper,
     const arma::vec &t0_mean,
     const arma::mat &t0_cov,
-    uint pg_rep)
+    arma::uword pg_rep)
 {
-    uint n_time = x.n_cols;
-    uint d_lat = x.n_rows;
+    arma::uword n_time = x.n_cols;
+    arma::uword d_lat = x.n_rows;
 
-    for (size_t i = 0; i < pg_rep; i++)
+    for (arma::uword i = 0; i < pg_rep; i++)
     {
         if (auto *m = dynamic_cast<imc_gp *>(&gp))
         {

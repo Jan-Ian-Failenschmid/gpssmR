@@ -41,14 +41,14 @@ void run_sim_latent(
     const mn_covar_wrapper &dyn_wrapper,
     const arma::vec &t0_mean,
     const arma::mat &t0_cov,
-    uint pg_rep);
+    arma::uword pg_rep);
 
 void run_pgas(
     const arma::mat &y,
     arma::mat &x,
     const arma::mat &covariate_dyn,
     const arma::mat &covariate_meas,
-    uint n_particles,
+    arma::uword n_particles,
     gp_base &gp,
     const mn_iw_model_ &dyn_model,
     const mn_covar_wrapper &dyn_wrapper,
@@ -56,6 +56,6 @@ void run_pgas(
     const mvn_covar_wrapper &meas_wrapper,
     const arma::vec &t0_mean,
     const arma::mat &t0_cov,
-    uint pg_rep);
+    arma::uword pg_rep);
 
 #endif

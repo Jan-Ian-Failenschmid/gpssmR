@@ -8,8 +8,8 @@
 // Simulate latent variable
 arma::mat sim_latent(
     const arma::mat &covariate, // Covariate data
-    const uint &n_time,         // Number of time-points
-    const uint &d_lat,          // State dimensions
+    const arma::uword &n_time,         // Number of time-points
+    const arma::uword &d_lat,          // State dimensions
     const hsgp_approx &hsgp,
     const arma::vec &t0_mean,   // Latent mean at t0
     const arma::mat &t0_cov,    // Latent mean at t0
@@ -31,7 +31,7 @@ arma::mat sim_latent(
     // Precompute cholesky transforms
     arma::mat dyn_cov_chol = chol(dyn_cov, "lower"); // Precompute cholesky
 
-    for (size_t t = 1; t < n_time; t++)
+    for (arma::uword t = 1; t < n_time; t++)
     {
         x.col(t) = trans_mat * hsgp_local.basis_functions(x.col(t - 1)) +
                    lat_covar * covariate.col(t - 1);
@@ -44,8 +44,8 @@ arma::mat sim_latent(
 
 arma::mat sim_latent(
     const arma::mat &covariate,
-    const uint &n_time,
-    const uint &d_lat,
+    const arma::uword &n_time,
+    const arma::uword &d_lat,
     const imc_gp &gp,
     const arma::vec &t0_mean, // Latent mean at t0
     const arma::mat &t0_cov,  // Latent mean at t0
@@ -79,7 +79,7 @@ arma::mat sim_latent(
     x_sample.col(1) = multi_output_gp.make_marginal_predictions() +
                       lat_covar * covariate.col(0);
 
-    for (size_t t = 1; t < (n_time - 1); t++)
+    for (arma::uword t = 1; t < (n_time - 1); t++)
     {
         // Use previous time points as training set
         multi_output_gp.update_train_data(

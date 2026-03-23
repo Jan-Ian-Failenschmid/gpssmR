@@ -51,9 +51,9 @@ arma::mat pgas(
     const arma::mat &y,
     const arma::mat &covariate_dyn,
     const arma::mat &covariate_meas,
-    const int &n_particles,
-    const int &n_time,
-    const int &d_lat,
+    const arma::uword &n_particles,
+    const arma::uword &n_time,
+    const arma::uword &d_lat,
     hsgp_approx &hsgp,
     const arma::mat &x_ref,
     const arma::vec &t0_mean,
@@ -145,7 +145,7 @@ arma::mat pgas(
     // Step 2 of Algorithm 2 in Svensson et al. 2016
     x.slice(0).col(n_particles - 1) = x_ref.col(0);
     timer.toc("pgas_set-up");
-    for (size_t t = 0; t < n_time; t++)
+    for (arma::uword t = 0; t < n_time; t++)
     {
         if (t >= 1)
         {
@@ -230,13 +230,13 @@ arma::mat pgas(
 
     // Sample an index from the weights at the last time point
     // Step 11 of Algorithm 2 in Svensson et al. 2016
-    uint star = systematic_resampling(weights.row(n_time - 1), 1)(0);
+    arma::uword star = systematic_resampling(weights.row(n_time - 1), 1)(0);
 
     // Trace the ancestral path of the selected index particle and combine
     // all its ancestors into the output sample stored in x_out
     // Step 9 of Algorithm 2 in Svensson et al. 2016
     x_out.col((n_time - 1)) = x.slice((n_time - 1)).col(star);
-    for (size_t i = 1; i < n_time; i++)
+    for (arma::uword i = 1; i < n_time; i++)
     {
         star = ancestors((n_time - 1) - i, star);
         x_out.col((n_time - 1) - i) = x.slice((n_time - 1) - i).col(star);
@@ -251,9 +251,9 @@ arma::mat pgas(
     const arma::mat &y,
     const arma::mat &covariate_dyn,
     const arma::mat &covariate_meas,
-    const int &n_particles,
-    const int &n_time,
-    const int &d_lat,
+    const arma::uword &n_particles,
+    const arma::uword &n_time,
+    const arma::uword &d_lat,
     imc_gp &gp,
     const arma::mat &x_ref,
     const arma::vec &t0_mean,
@@ -335,7 +335,7 @@ arma::mat pgas(
     std::vector<imc_gp> multi_output_gp;
     multi_output_gp.resize(n_particles);
 
-    for (size_t i = 0; i < n_particles; i++)
+    for (arma::uword i = 0; i < n_particles; i++)
     {
         multi_output_gp[i].update_hyperparameters(gp.alpha, gp.rho);
         multi_output_gp[i].update_sigma(dyn_cov);
@@ -354,13 +354,13 @@ arma::mat pgas(
     // Vector holding temp weights
     arma::rowvec weights_n(n_particles, arma::fill::zeros);
     arma::mat x_ref_adj = x_ref;
-    for (size_t k = 1; k < n_time; k++)
+    for (arma::uword k = 1; k < n_time; k++)
     {
         x_ref_adj.col(k) -= lat_covar * covariate_dyn.col(k - 1);
     }
     arma::vec BZ;
 
-    for (size_t t = 0; t < n_time; t++)
+    for (arma::uword t = 0; t < n_time; t++)
     {
         if (t >= 1)
         {
@@ -370,7 +370,7 @@ arma::mat pgas(
                 systematic_resampling(weights.row(t - 1), n_particles - 1);
 
             // Calculate ancestor weights for reference particle
-            for (size_t i = 0; i < n_particles; i++)
+            for (arma::uword i = 0; i < n_particles; i++)
             {
                 // Sample ancestor index for reference particle
                 if (t < n_time - 1)
@@ -400,7 +400,7 @@ arma::mat pgas(
             multi_output_gp = resample_std_vector(multi_output_gp,
                                                   ancestors.row(t - 1).t());
 
-            for (size_t i = 0; i < n_particles; i++)
+            for (arma::uword i = 0; i < n_particles; i++)
             {
                 // For all particles except the reference particle
                 // make predictions for x_t
@@ -466,7 +466,7 @@ arma::mat pgas(
 
             // Update GP posteriors to include newly sampled data ------
             // Add new predictions to particles
-            for (size_t i = 0; i < n_particles; i++)
+            for (arma::uword i = 0; i < n_particles; i++)
             {
                 // Append X_t-1 to training data
                 multi_output_gp[i].append_train_data(
@@ -489,12 +489,12 @@ arma::mat pgas(
     arma::mat x_out(d_lat, n_time, arma::fill::zeros);
 
     // Sample an index from the weights at the last time point
-    uint star = systematic_resampling(weights.row(n_time - 1), 1)(0);
+    arma::uword star = systematic_resampling(weights.row(n_time - 1), 1)(0);
 
     // Trace the ancestral path of the selected index particle and combine
     // all its ancestors into the output sample stored in x_out
     x_out.col((n_time - 1)) = x.slice((n_time - 1)).col(star);
-    for (size_t i = 1; i < n_time; i++)
+    for (arma::uword i = 1; i < n_time; i++)
     {
         star = ancestors((n_time - 1) - i, star);
         x_out.col((n_time - 1) - i) = x.slice((n_time - 1) - i).col(star);
