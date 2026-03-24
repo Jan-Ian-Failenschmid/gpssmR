@@ -24,7 +24,7 @@ accessing the samplers for their posterior and prior predictive distributions.
 Install from source:
 
 ```r
-# install.packages("pak")
-pak::pak("Jan-Ian-Failenschmid/gpssmR")
+# install.packages("devtools")
+devtools::install_github("Jan-Ian-Failenschmid/gpssmR")
 
 ```
