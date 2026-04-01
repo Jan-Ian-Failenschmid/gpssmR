@@ -357,7 +357,7 @@ arma::mat gpssm_sample(
             }
             timer.tic("mh.make_step");
             rw_mh.mh_step(); // Accept or reject proposal
-            timer.tic("mh.make_step");
+            timer.toc("mh.make_step");
         }
         rw_mh.tune_proposal(); // Tune proposal based on acceptance ratio
 

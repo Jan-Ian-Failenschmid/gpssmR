@@ -73,6 +73,7 @@ void update_model_hyperparameters(
     wrapper.combine_priors();
     model.mn->stabalize_col_cov_();
     model.calc_posterior_parameters();
+    timer.toc("mh.gp_hyperpars");
     // model.mn->calc_marginal_parameters();
     // model.iw->calc_posterior_parameters();
 }
