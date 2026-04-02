@@ -13,6 +13,46 @@
 
 using namespace Rcpp;
 
+namespace
+{
+template <typename EmitFn>
+arma::uword sample_size(const EmitFn &emit)
+{
+    arma::uword size = 0;
+    auto count = [&](const auto &value)
+    {
+        const arma::vec flat_value(arma::vectorise(value));
+        size += flat_value.n_elem;
+    };
+
+    emit(count);
+    return size;
+}
+
+template <typename EmitFn>
+void fill_sample_vector(arma::vec &sample, const EmitFn &emit)
+{
+    arma::uword pos = 0;
+    auto append = [&](const auto &value)
+    {
+        arma::vec flat_value = arma::vectorise(value);
+
+        if (!flat_value.n_elem)
+            return;
+
+        sample.subvec(pos, pos + flat_value.n_elem - 1) = flat_value;
+        pos += flat_value.n_elem;
+    };
+
+    emit(append);
+
+    if (pos != sample.n_elem)
+    {
+        throw std::runtime_error("Sample vector size mismatch");
+    }
+}
+} // namespace
+
 // [[Rcpp::export]]
 arma::mat gpssm_sample(
 
@@ -144,18 +184,8 @@ arma::mat gpssm_sample(
         dyn_cov_scale_chol,
         dyn_cov_df);
 
-    // Lambda functions
     arma::vec par_vec;
-    arma::uword par_size;
-    arma::uword pos = 0;
-    auto append = [&](const auto &v)
-    {
-        if (!v.n_elem)
-            return;
-
-        par_vec.subvec(pos, pos + v.n_elem - 1) = arma::vectorise(v);
-        pos += v.n_elem;
-    };
+    arma::vec log_lik_vec(1);
 
     //   auto set_gp_hyperpars = [&](const arma::vec &p)
     //   {
@@ -380,47 +410,35 @@ arma::mat gpssm_sample(
         // ---------------------------------
         // Save samples to output
         // ---------------------------------
-
-        // Count number of parameters
-        if (k == 0)
-        {
-            par_size = 0;
-            if (post_pred)
-                par_size += y_post_pred.n_elem;
-            par_size += x.n_elem;
-            par_size += gp_sample.n_elem;
-            par_size += rw_mh.par.n_elem;
-            if (!exact)
-                par_size += dyn_model_wrapper.get_pred_param().n_elem;
-            par_size += dyn_model_wrapper.get_covar_param().n_elem;
-            par_size += dyn_model.get_cov().n_elem;
-            par_size += meas_model_wrapper.get_pred_param().n_elem;
-            par_size += meas_model_wrapper.get_covar_param().n_elem;
-            par_size += meas_model.get_cov().n_elem;
-            par_size += 1;
-            par_vec.set_size(par_size);
-            samples.set_size(n_total / n_thin, par_size);
-        }
-        // Fill parameter vector
         if (k % n_thin == 0)
         {
-            pos = 0;
-            if (post_pred)
+            log_lik_vec[0] = log_lik;
+            auto emit_sample_parts = [&](const auto &push)
             {
-                append(y_post_pred);
+                if (post_pred)
+                    push(y_post_pred);
+
+                push(x);
+                push(gp_sample);
+                push(arma::exp(rw_mh.par));
+                if (!exact)
+                    push(dyn_model_wrapper.get_pred_param());
+                push(dyn_model_wrapper.get_covar_param());
+                push(dyn_model.get_cov());
+                push(meas_model_wrapper.get_pred_param());
+                push(meas_model_wrapper.get_covar_param());
+                push(meas_model.get_cov());
+                push(log_lik_vec);
+            };
+
+            if (samples.is_empty())
+            {
+                par_vec.set_size(sample_size(emit_sample_parts));
+                samples.set_size(n_total / n_thin, par_vec.n_elem);
             }
-            append(x);
-            append(gp_sample);
-            append(arma::vec(arma::exp(rw_mh.par)));
-            if (!exact)
-                append(dyn_model_wrapper.get_pred_param());
-            append(dyn_model_wrapper.get_covar_param());
-            append(dyn_model.get_cov());
-            append(meas_model_wrapper.get_pred_param());
-            append(meas_model_wrapper.get_covar_param());
-            append(meas_model.get_cov());
-            append(arma::vec(1).fill(log_lik));
-            
+
+            fill_sample_vector(par_vec, emit_sample_parts);
+
             // Store in samples matrix
             samples.row(k / n_thin) = par_vec.t();
         }
@@ -554,18 +572,8 @@ arma::mat gpssm_prior_sample(
         dyn_cov_scale_chol,
         dyn_cov_df);
 
-    // Lambda functions
     arma::vec par_vec;
-    arma::uword par_size;
-    arma::uword pos = 0;
-    auto append = [&](const auto &v)
-    {
-        if (!v.n_elem)
-            return;
-
-        par_vec.subvec(pos, pos + v.n_elem - 1) = arma::vectorise(v);
-        pos += v.n_elem;
-    };
+    arma::vec log_lik_vec(1);
 
     // Initialize temparary and output matreces
     arma::mat samples;
@@ -636,44 +644,32 @@ arma::mat gpssm_prior_sample(
                                                  meas_model.get_cov(), "lower")));
         }
 
-        // Count number of parameters
-        if (k == 0)
+        log_lik_vec[0] = log_lik;
+        auto emit_sample_parts = [&](const auto &push)
         {
-            par_size = 0;
             if (pred)
-                par_size += y_pred.n_elem;
-            par_size += x.n_elem;
-            par_size += gp_sample.n_elem;
-            par_size += hyperparameters.n_elem;
+                push(y_pred);
+
+            push(x);
+            push(gp_sample);
+            push(arma::exp(hyperparameters));
             if (!exact)
-                par_size += dyn_model_wrapper.get_pred_param().n_elem;
-            par_size += covariate_ceof_temp.n_elem;
-            par_size += dyn_model.get_cov().n_elem;
-            par_size += meas_model_wrapper.get_pred_param().n_elem;
-            par_size += meas_model_wrapper.get_covar_param().n_elem;
-            par_size += meas_model.get_cov().n_elem;
-            par_size += 1;
-            par_vec.set_size(par_size);
-            samples.set_size(n_iter, par_size);
-        }
+                push(dyn_model_wrapper.get_pred_param());
+            push(covariate_ceof_temp);
+            push(dyn_model.get_cov());
+            push(meas_model_wrapper.get_pred_param());
+            push(meas_model_wrapper.get_covar_param());
+            push(meas_model.get_cov());
+            push(log_lik_vec);
+        };
 
-        pos = 0;
-        if (pred)
+        if (samples.is_empty())
         {
-            append(y_pred);
+            par_vec.set_size(sample_size(emit_sample_parts));
+            samples.set_size(n_iter, par_vec.n_elem);
         }
-        append(x);
-        append(gp_sample);
-        append(arma::vec(arma::exp(hyperparameters)));
-        if (!exact)
-            append(dyn_model_wrapper.get_pred_param());
-        append(covariate_ceof_temp);
-        append(dyn_model.get_cov());
-        append(meas_model_wrapper.get_pred_param());
-        append(meas_model_wrapper.get_covar_param());
-        append(meas_model.get_cov());
 
-        append(arma::vec(1).fill(log_lik));
+        fill_sample_vector(par_vec, emit_sample_parts);
 
         // Store in samples matrix
         samples.row(k) = par_vec.t();
