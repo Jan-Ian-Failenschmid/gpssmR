@@ -92,14 +92,11 @@ arma::mat pgas(
     arma::rowvec weights_n(n_particles, arma::fill::zeros);
 
     // Precompute parameter transformations
-    arma::mat dyn_cov_inv = inv_sympd(dyn_cov);      // Precompute matrix inverse
-    arma::mat dyn_cov_chol = chol(dyn_cov, "lower"); // Precompute cholesky
-    arma::mat meas_cov_inv = inv_sympd(meas_cov);    // Precompute matrix inverse
+    arma::mat dyn_cov_inv = inv_sympd(dyn_cov); // Precompute matrix inverse
 
     // Precompute parameters for proposal distribution
     // Proposal function adapted from:
     // Snyder, "Particle filters, the “optimal” proposal and high-dimensional systems"
-    arma::mat t0_cov_inv = inv_sympd(t0_cov);
     arma::mat t0_kalman_gain = t0_cov * des_mat.t() *
                                inv_sympd(des_mat * t0_cov * des_mat.t() +
                                          meas_cov);
@@ -110,7 +107,6 @@ arma::mat pgas(
                                                           des_mat, meas_covar));
 
     arma::mat t0_prop_cov = t0_cov - t0_kalman_gain * des_mat * t0_cov;
-    arma::mat t0_prop_cov_inv = inv_sympd(t0_prop_cov);
     arma::mat t0_prop_cov_chol = chol(t0_prop_cov, "lower");
 
     // Analytic covariance of the weights distribution Snyder eq.: 16
@@ -119,14 +115,12 @@ arma::mat pgas(
     // particles have the same mean at t0 (t0_mean) calculating the weights
     // can be skipped.
     arma::mat weights_cov = des_mat * dyn_cov * des_mat.t() + meas_cov;
-    arma::mat weights_cov_chol = chol(weights_cov, "lower");
     arma::mat weights_cov_inv = inv_sympd(weights_cov);
     arma::mat dyn_kalman_gain = dyn_cov * des_mat.t() *
                                 inv_sympd(des_mat * dyn_cov * des_mat.t() +
                                           meas_cov);
     arma::mat prop_mean(d_lat, n_particles);
     arma::mat prop_cov = dyn_cov - dyn_kalman_gain * des_mat * dyn_cov;
-    arma::mat prop_cov_inv = inv_sympd(prop_cov);
     arma::mat prop_cov_chol = chol(prop_cov, "lower");
 
     // Sample particle starting value from distribution of x_1
@@ -281,10 +275,8 @@ arma::mat pgas(
     // Precompute parameters for proposal distribution
     // Proposal function adapted from:
     // Snyder, "Particle filters, the “optimal” proposal and high-dimensional systems"
-    arma::mat meas_cov_inv = inv(meas_cov); // Precompute matrix inverse
     arma::mat meas_cov_chol = chol(meas_cov, "lower");
 
-    arma::mat t0_cov_inv = inv_sympd(t0_cov);
     arma::mat t0_kalman_gain = t0_cov * des_mat.t() *
                                inv_sympd(des_mat * t0_cov * des_mat.t() +
                                          meas_cov);
@@ -295,7 +287,6 @@ arma::mat pgas(
                                                           des_mat, meas_covar));
 
     arma::mat t0_prop_cov = t0_cov - t0_kalman_gain * des_mat * t0_cov;
-    arma::mat t0_prop_cov_inv = inv_sympd(t0_prop_cov);
     arma::mat t0_prop_cov_chol = chol(t0_prop_cov, "lower");
 
     // Analytic covariance of the weights distribution Snyder eq.: 16
@@ -309,12 +300,10 @@ arma::mat pgas(
 
     arma::mat weights_cov(d_meas, d_meas);
     arma::mat weights_cov_chol(d_meas, d_meas);
-    arma::mat weights_cov_inv(d_meas, d_meas);
     arma::mat dyn_kalman_gain(d_lat, d_meas);
 
     arma::vec prop_mean(d_lat);
     arma::mat prop_cov(d_lat, d_lat);
-    arma::mat prop_cov_inv(d_lat, d_lat);
     arma::mat prop_cov_chol(d_lat, d_lat);
 
     arma::vec y_pred(d_meas);
