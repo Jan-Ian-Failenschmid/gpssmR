@@ -5,8 +5,6 @@
 #include "test_helper.h"
 #include "linear_algebra.h"
 #include "hsgp_struct.h"
-#include "base_structs.h"
-#include "derived_structs.h"
 #include "main_helper.h"
 
 context("C++ HSGP Matrix-normal-inverse-Wishart")

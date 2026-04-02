@@ -3,8 +3,6 @@
 
 #include "base_structs.h"
 #include "derived_structs.h"
-#include "hsgp_struct.h"
-#include "imc_gp_struct.h"
 
 mn_iw_model_ init_mn_iw_model(
     arma::mat &Y,

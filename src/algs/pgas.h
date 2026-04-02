@@ -2,12 +2,10 @@
 #define PGAS_H
 
 // [[Rcpp::depends(RcppArmadillo)]]
-#include "pgas.h"
-#include "imc_gp_struct.h"
-#include "hsgp_struct.h"
-#include "base_structs.h"
-#include "derived_structs.h"
-#include "resampling.h"
+#include <RcppArmadillo.h>
+
+struct imc_gp;
+struct hsgp_approx;
 
 // PGAS Markov kernel
 arma::mat pgas(

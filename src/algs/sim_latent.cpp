@@ -1,9 +1,7 @@
 // [[Rcpp::depends(RcppArmadillo)]]
-#include <RcppArmadillo.h>
 #include "sim_latent.h"
 #include "hsgp_struct.h"
 #include "imc_gp_struct.h"
-#include "linear_algebra.h"
 
 // Simulate latent variable
 arma::mat sim_latent(

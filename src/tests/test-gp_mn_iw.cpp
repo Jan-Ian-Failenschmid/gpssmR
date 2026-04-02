@@ -4,8 +4,7 @@
 #include <RcppArmadillo.h>
 #include "test_helper.h"
 #include "linear_algebra.h"
-#include "base_structs.h"
-#include "derived_structs.h"
+#include "imc_gp_struct.h"
 #include "main_helper.h"
 
 context("C++ GP Matrix-normal-inverse-Wishart")

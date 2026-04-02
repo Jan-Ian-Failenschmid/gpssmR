@@ -1,11 +1,9 @@
 // [[Rcpp::depends(RcppArmadillo)]]
 
-#include <RcppArmadillo.h>
 #include "pgas.h"
 #include "imc_gp_struct.h"
 #include "hsgp_struct.h"
-#include "base_structs.h"
-#include "derived_structs.h"
+#include "pdfs.h"
 #include "resampling.h"
 #include "timer.h"
 

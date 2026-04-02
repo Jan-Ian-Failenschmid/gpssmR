@@ -2,8 +2,9 @@
 #define SIM_LATENT_H
 
 #include <RcppArmadillo.h>
-#include "hsgp_struct.h"
-#include "imc_gp_struct.h"
+
+struct hsgp_approx;
+struct imc_gp;
 
 arma::mat sim_latent(
     const arma::mat &covariate, // Covariate data

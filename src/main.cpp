@@ -3,19 +3,11 @@
 // [[Rcpp::depends(RcppProgress)]]
 #include <RcppArmadillo.h>
 #include <progress.hpp>
-#include <progress_bar.hpp>
-#include <cmath> // For M_PI
-#include <rcpptimer.h>
 
 #include "linear_algebra.h"
-#include "resampling.h"
 #include "hsgp_struct.h"
 #include "imc_gp_struct.h"
 #include "mh_kernel.h"
-#include "pgas.h"
-#include "sim_latent.h"
-#include "base_structs.h"
-#include "derived_structs.h"
 #include "main_helper.h"
 #include "timer.h"
 

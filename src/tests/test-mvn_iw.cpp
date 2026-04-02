@@ -4,8 +4,6 @@
 #include <RcppArmadillo.h>
 #include "test_helper.h"
 #include "linear_algebra.h"
-#include "base_structs.h"
-#include "derived_structs.h"
 #include "main_helper.h"
 
 context("C++ Multivariate-normal-inverse-Wishart")

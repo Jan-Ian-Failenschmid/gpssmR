@@ -1,6 +1,5 @@
 // [[Rcpp::depends(RcppArmadillo)]]
 
-#include <RcppArmadillo.h>
 #include "mh_kernel.h"
 
 // Constructor

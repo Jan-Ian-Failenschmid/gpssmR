@@ -1,9 +1,7 @@
 // [[Rcpp::depends(RcppArmadillo)]]
 
-#include <RcppArmadillo.h>
 #include "imc_gp_struct.h"
 #include "imc_gp_helper.h"
-#include "base_structs.h"
 #include "linear_algebra.h"
 #include "pdfs.h"
 

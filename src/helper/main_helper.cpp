@@ -1,7 +1,4 @@
 // [[Rcpp::depends(RcppArmadillo)]]
-#include <RcppArmadillo.h>
-#include "base_structs.h"
-#include "derived_structs.h"
 #include "hsgp_struct.h"
 #include "imc_gp_struct.h"
 #include "sim_latent.h"

@@ -5,8 +5,6 @@
 #include "test_helper.h"
 #include "linear_algebra.h"
 #include "main_helper.h"
-#include "base_structs.h"
-#include "derived_structs.h"
 
 context("C++ Matrix-normal-inverse-Wishart")
 {
