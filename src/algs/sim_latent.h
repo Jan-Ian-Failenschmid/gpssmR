@@ -2,6 +2,7 @@
 #define SIM_LATENT_H
 
 #include <RcppArmadillo.h>
+#include <utility>
 
 struct hsgp_approx;
 struct imc_gp;
@@ -28,5 +29,15 @@ arma::mat sim_latent(
     const arma::mat &lat_covar,
     const arma::mat &dyn_cov
 );
+
+std::pair<arma::mat, arma::mat> sim_latent_joined(
+    const arma::mat &covariate,
+    const arma::uword &n_time,
+    const arma::uword &d_lat,
+    const imc_gp &gp,
+    const arma::vec &t0_mean, // Latent mean at t0
+    const arma::mat &t0_cov,  // Latent mean at t0
+    const arma::mat &lat_covar,
+    const arma::mat &dyn_cov);
 
 #endif

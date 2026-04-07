@@ -2,12 +2,13 @@
 #include "sim_latent.h"
 #include "hsgp_struct.h"
 #include "imc_gp_struct.h"
+#include <utility>
 
 // Simulate latent variable
 arma::mat sim_latent(
     const arma::mat &covariate, // Covariate data
-    const arma::uword &n_time,         // Number of time-points
-    const arma::uword &d_lat,          // State dimensions
+    const arma::uword &n_time,  // Number of time-points
+    const arma::uword &d_lat,   // State dimensions
     const hsgp_approx &hsgp,
     const arma::vec &t0_mean,   // Latent mean at t0
     const arma::mat &t0_cov,    // Latent mean at t0
@@ -17,7 +18,7 @@ arma::mat sim_latent(
 )
 {
     hsgp_approx hsgp_local = hsgp;
-    
+
     // Initialize latent variable matrix
     arma::mat x(d_lat, n_time);
 
@@ -52,9 +53,6 @@ arma::mat sim_latent(
 {
     arma::mat x_sample(d_lat, n_time);
 
-    // std::vector<multiv_gp> multi_output_gp;
-    // multi_output_gp.resize(d_lat);
-
     imc_gp multi_output_gp;
 
     // Draw first latent variable value from its prior
@@ -80,15 +78,58 @@ arma::mat sim_latent(
     for (arma::uword t = 1; t < (n_time - 1); t++)
     {
         // Use previous time points as training set
-        multi_output_gp.update_train_data(
-            x_sample.cols(0, t - 1),
-            x_sample.cols(1, t));
-        multi_output_gp.set_train_y_cov_I();
+        multi_output_gp.append_train_data(
+            x_sample.col(t - 1),
+            x_sample.col(t) - lat_covar * covariate.col(t - 1));
+        multi_output_gp.append_train_y_cov_I();
         // Use untransformed (independent GPs) as outcomes
         multi_output_gp.update_test_data(x_sample.col(t));
         x_sample.col(t + 1) = multi_output_gp.make_marginal_predictions() +
                               lat_covar * covariate.col(t);
     }
+
     // Return all objects in a list
     return x_sample;
+};
+
+std::pair<arma::mat, arma::mat> sim_latent_joined(
+    const arma::mat &covariate,
+    const arma::uword &n_time,
+    const arma::uword &d_lat,
+    const imc_gp &gp,
+    const arma::vec &t0_mean, // Latent mean at t0
+    const arma::mat &t0_cov,  // Latent mean at t0
+    const arma::mat &lat_covar,
+    const arma::mat &dyn_cov)
+{
+    arma::mat x_sample(d_lat, n_time);
+    arma::mat gp_sample(d_lat, n_time - 1);
+
+    x_sample = sim_latent(
+        covariate,
+        n_time,
+        d_lat,
+        gp,
+        t0_mean, // Latent mean at t0
+        t0_cov,  // Latent mean at t0
+        lat_covar,
+        dyn_cov);
+
+    imc_gp multi_output_gp;
+
+    multi_output_gp.update_hyperparameters(gp.alpha, gp.rho);
+    multi_output_gp.update_sigma(dyn_cov);
+
+    multi_output_gp.update_train_data(
+        x_sample.cols(0, n_time - 2),
+        x_sample.cols(1, n_time - 1) -
+            lat_covar * covariate.cols(0, n_time - 2));
+    multi_output_gp.set_train_y_cov_I();
+    multi_output_gp.update_test_data(x_sample.cols(0, n_time - 2));
+    multi_output_gp.set_test_y_cov_I();
+
+    gp_sample = multi_output_gp.make_test_predictions();
+
+    // Return all objects in a list
+    return {gp_sample, x_sample};
 };

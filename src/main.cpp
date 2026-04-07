@@ -9,48 +9,50 @@
 #include "imc_gp_struct.h"
 #include "mh_kernel.h"
 #include "main_helper.h"
+#include "sim_latent.h"
 #include "timer.h"
+#include <utility>
 
 using namespace Rcpp;
 
 namespace
 {
-template <typename EmitFn>
-arma::uword sample_size(const EmitFn &emit)
-{
-    arma::uword size = 0;
-    auto count = [&](const auto &value)
+    template <typename EmitFn>
+    arma::uword sample_size(const EmitFn &emit)
     {
-        const arma::vec flat_value(arma::vectorise(value));
-        size += flat_value.n_elem;
-    };
+        arma::uword size = 0;
+        auto count = [&](const auto &value)
+        {
+            const arma::vec flat_value(arma::vectorise(value));
+            size += flat_value.n_elem;
+        };
 
-    emit(count);
-    return size;
-}
-
-template <typename EmitFn>
-void fill_sample_vector(arma::vec &sample, const EmitFn &emit)
-{
-    arma::uword pos = 0;
-    auto append = [&](const auto &value)
-    {
-        arma::vec flat_value = arma::vectorise(value);
-
-        if (!flat_value.n_elem)
-            return;
-
-        sample.subvec(pos, pos + flat_value.n_elem - 1) = flat_value;
-        pos += flat_value.n_elem;
-    };
-
-    emit(append);
-
-    if (pos != sample.n_elem)
-    {
-        throw std::runtime_error("Sample vector size mismatch");
+        emit(count);
+        return size;
     }
-}
+
+    template <typename EmitFn>
+    void fill_sample_vector(arma::vec &sample, const EmitFn &emit)
+    {
+        arma::uword pos = 0;
+        auto append = [&](const auto &value)
+        {
+            arma::vec flat_value = arma::vectorise(value);
+
+            if (!flat_value.n_elem)
+                return;
+
+            sample.subvec(pos, pos + flat_value.n_elem - 1) = flat_value;
+            pos += flat_value.n_elem;
+        };
+
+        emit(append);
+
+        if (pos != sample.n_elem)
+        {
+            throw std::runtime_error("Sample vector size mismatch");
+        }
+    }
 } // namespace
 
 // [[Rcpp::export]]
@@ -577,10 +579,10 @@ arma::mat gpssm_prior_sample(
 
     // Initialize temparary and output matreces
     arma::mat samples;
-    arma::mat covariate_ceof_temp;
     arma::mat y_pred(d_obs, n_time);
     arma::mat gp_sample(d_lat, n_time - 1);
     double log_lik;
+
     for (arma::uword k = 0; k < n_iter; k++)
     {
         // Increment progress bar
@@ -594,38 +596,56 @@ arma::mat gpssm_prior_sample(
         }
         // Sample hyperparameters
         hyperparameters = Rcpp::as<arma::vec>(rprior());
-        gp->set_hyperparameters(
-            std::exp(hyperparameters[0]), std::exp(hyperparameters[1]));
+        update_model_hyperparameters(hyperparameters, *gp, dyn_model,
+                                     dyn_model_wrapper);
         // Sample measurement model
         meas_model.sample_prior();
         // Sample dynamic model
         dyn_model.sample_prior();
-        // Sample latent variable
-        run_sim_latent(
-            x, covariate_dyn,
-            *gp, dyn_model, dyn_model_wrapper,
-            t0_mean, t0_cov,
-            1);
-        x_out = x.cols(sp_out);
-        x_pred = x.cols(sp_pred);
-        covariate_ceof_temp = dyn_model_wrapper.get_covar_param();
-        // For the exact model - save the covariate sample and draw a new
-        // GP model with a prior that conditions on x_pred.
-        // So that covariate_ceof_temp is fixed from when x was sampled
-        // and the GP is marginalized when X was sampled and
-        // and sampled afterwards
+
+        // Sample latent variable and gp
         if (exact)
         {
-            update_model_predictor(x_pred, *gp, dyn_model, dyn_model_wrapper);
-            dyn_model.sample_prior();
+            const auto &gp_exact = dynamic_cast<const imc_gp &>(*gp);
+            const auto latent_joined = sim_latent_joined(
+                covariate_dyn,
+                n_time,
+                d_lat,
+                gp_exact,
+                t0_mean,
+                t0_cov,
+                dyn_model_wrapper.get_covar_param(),
+                dyn_model.get_cov());
+            gp_sample = latent_joined.first;
+            x = latent_joined.second;
         }
+        else
+        {
+            const auto &gp_approx = dynamic_cast<const hsgp_approx &>(*gp);
+            x = sim_latent(
+                covariate_dyn,
+                n_time,
+                d_lat,
+                gp_approx,
+                t0_mean,
+                t0_cov,
+                dyn_model_wrapper.get_pred_param(),
+                dyn_model_wrapper.get_covar_param(),
+                dyn_model.get_cov());
+
+            // x_out = x.cols(sp_out);
+            x_pred = x.cols(sp_pred);
+            update_model_predictor(x_pred, *gp, dyn_model, dyn_model_wrapper);
+            gp_sample = dyn_model_wrapper.get_pred_param() *
+                        (*gp->get_predictor_ptr()); // Phi
+        }
+
         // Sample derived properties
         meas_model_wrapper.combine_data();
         y_pred = meas_model.get_param() * meas_model_wrapper.combined_data;
         y_pred += chol(meas_model.get_cov(), "lower") *
                   arma::randn(d_obs, n_time, arma::distr_param(0.0, 1.0));
-        gp_sample = dyn_model_wrapper.get_pred_param() *
-                    (*gp->get_predictor_ptr());
+
 
         if (y.n_elem != 0)
         {
@@ -655,7 +675,7 @@ arma::mat gpssm_prior_sample(
             push(arma::exp(hyperparameters));
             if (!exact)
                 push(dyn_model_wrapper.get_pred_param());
-            push(covariate_ceof_temp);
+            push(dyn_model_wrapper.get_covar_param());
             push(dyn_model.get_cov());
             push(meas_model_wrapper.get_pred_param());
             push(meas_model_wrapper.get_covar_param());
