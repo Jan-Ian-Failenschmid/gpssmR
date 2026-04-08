@@ -258,7 +258,7 @@ arma::mat gpssm_sample(
     // ---------------------------------
     for (arma::uword k = 0; k < n_total; k++)
     {
-
+        timer.tic("iter");
         // Increment progress bar
         if (Progress::check_abort())
         {
@@ -444,6 +444,7 @@ arma::mat gpssm_sample(
             // Store in samples matrix
             samples.row(k / n_thin) = par_vec.t();
         }
+        timer.toc("iter");
     }
     timer.stop();
     // Return samples matrix
