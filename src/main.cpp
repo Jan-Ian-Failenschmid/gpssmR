@@ -118,7 +118,8 @@ arma::mat gpssm_sample(
     // Initialize MH --------
     arma::vec hyperparameters(2);
     hyperparameters = Rcpp::as<arma::vec>(rprior());
-    mh_kernel rw_mh(hyperparameters, dprior, n_warm_up, mh_adapt_start);
+    mh_kernel rw_mh(hyperparameters, dprior,
+                    n_warm_up * n_thin, mh_adapt_start);
 
     // Extract predictors for the dynamic model
     arma::span sp_pred(0, n_time - 2);
@@ -353,6 +354,7 @@ arma::mat gpssm_sample(
 
         // MH - step
         rw_mh.advance_iter();
+        rw_mh.reset_acceptance_rate();
         for (arma::uword i = 0; i < mh_rep; i++)
         {
             timer.tic("mh.make_prop");
@@ -383,8 +385,10 @@ arma::mat gpssm_sample(
             rw_mh.mh_step(); // Accept or reject proposal
             timer.toc("mh.make_step");
         }
-        rw_mh.tune_proposal(); // Tune proposal based on acceptance ratio
+        rw_mh.finalize_acceptance_rate();
+        rw_mh.tune_proposal(); // Tune proposal based on average acceptance
 
+        
         // // Update hyperparameters
         timer.tic("mh.set_hyperpars2");
         update_model_hyperparameters(rw_mh.par, *gp, dyn_model,
@@ -646,7 +650,6 @@ arma::mat gpssm_prior_sample(
         y_pred = meas_model.get_param() * meas_model_wrapper.combined_data;
         y_pred += chol(meas_model.get_cov(), "lower") *
                   arma::randn(d_obs, n_time, arma::distr_param(0.0, 1.0));
-
 
         if (y.n_elem != 0)
         {

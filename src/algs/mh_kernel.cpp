@@ -11,10 +11,12 @@ mh_kernel::mh_kernel(
                                                        par_inp.end()),
                                    R_prop_par(), dprior(dprior_inp),
                                    prop_cov_chol(),
-                                   log_lik(), t0(), warm_up(warm_up_inp),
-                                   adapt_start(adapt_start_inp),
-                                   proposal_log_lik(), prop_par(),
-                                   acceptance_rate()
+                                    log_lik(), t0(), warm_up(warm_up_inp),
+                                    adapt_start(adapt_start_inp),
+                                    proposal_log_lik(), prop_par(),
+                                    acceptance_rate(),
+                                    acceptance_rate_sum(),
+                                    acceptance_rate_n()
 {
     d_par = par.size();
     iter = 0;
@@ -52,6 +54,21 @@ mh_kernel::mh_kernel(
 void mh_kernel::advance_iter()
 {
     iter += 1;
+}
+
+void mh_kernel::reset_acceptance_rate()
+{
+    acceptance_rate_sum = 0.0;
+    acceptance_rate_n = 0;
+}
+
+void mh_kernel::finalize_acceptance_rate()
+{
+    if (acceptance_rate_n > 0)
+    {
+        acceptance_rate = acceptance_rate_sum /
+                          static_cast<double>(acceptance_rate_n);
+    }
 }
 
 void mh_kernel::tune_proposal()
@@ -102,6 +119,8 @@ void mh_kernel::mh_step()
     acceptance_rate = proposal_log_lik - log_lik +
                       proposal_log_prior - log_prior;
     acceptance_rate = std::min(1.0, std::exp(acceptance_rate));
+    acceptance_rate_sum += acceptance_rate;
+    acceptance_rate_n += 1;
     if (arma::randu() < acceptance_rate)
     {
         par = prop_par;

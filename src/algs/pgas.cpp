@@ -142,17 +142,26 @@ arma::mat pgas(
         if (t >= 1)
         {
             timer.tic("pgas_move");
-            // Systematically resample ancestor indices according to importance
-            // weights
-            // Step 5 of Algorithm 2 in Svensson et al. 2016
-            ancestors.row(t - 1).subvec(0, n_particles - 2) =
-                systematic_resampling(weights.row(t - 1), n_particles - 1);
-
             // Precalculate predictions of all previous particle states and store in
             // x_pred for later use
             x_pred = transit_model(
                 hsgp.basis_functions(x.slice(t - 1)),
                 covariate_dyn.col(t - 1), trans_mat, lat_covar);
+
+            // Systematically resample ancestor indices according to APF
+            // look-ahead weights
+            // Step 5 of Algorithm 2 in Svensson et al. 2016
+            y_pred = meas_model(
+                x_pred,
+                covariate_meas.col(t),
+                des_mat, meas_covar);
+            weights_n = log(weights.row(t - 1));
+            weights_n += arma::trans(mat_logdnorm_unnorm_inv(
+                arma::vec(y.col(t)),
+                y_pred, weights_cov_inv));
+            softmax(weights_n);
+            ancestors.row(t - 1).subvec(0, n_particles - 2) =
+                systematic_resampling(weights_n, n_particles - 1);
 
             // Resample predictions according to ancestor indices
             x_pred_resampled.cols(0, n_particles - 2) =
@@ -202,15 +211,8 @@ arma::mat pgas(
             ancestors.row(t - 1)(n_particles - 1) = systematic_resampling(
                 weights_n, 1)(0);
 
-            // Add predicted value for the reference particle to the resampled matrix
-            // for weight calculation
-            x_pred_resampled.col(n_particles - 1) =
-                x_pred.col(ancestors.row(t - 1)(n_particles - 1));
-
-            // Calculate weights
-            weights.row(t) = arma::trans(mat_logdnorm_unnorm_inv(
-                arma::vec(y.col(t)),
-                des_mat * x_pred_resampled, weights_cov_inv));
+            // Fully adapted APF weights are constant after propagation.
+            weights.row(t).zeros();
             timer.toc("pgas_weights");
         }
         softmax(weights.row(t));
@@ -321,6 +323,9 @@ arma::mat pgas(
 
     std::vector<imc_gp> multi_output_gp;
     multi_output_gp.resize(n_particles);
+    std::vector<arma::mat> pred_mean_cache(n_particles);
+    std::vector<arma::mat> dyn_cov_k_chol_cache(n_particles);
+    std::vector<arma::mat> weights_cov_chol_cache(n_particles);
 
     for (arma::uword i = 0; i < n_particles; i++)
     {
@@ -352,9 +357,34 @@ arma::mat pgas(
         if (t >= 1)
         {
             // Ancestor sampling -----
-            // Standard resampling for particles 1:N-1
+            // Systematically resample ancestor indices according to APF
+            // look-ahead weights for particles 1:N-1
+            BZ = lat_covar * covariate_dyn.col(t - 1);
+            for (arma::uword i = 0; i < n_particles; i++)
+            {
+                multi_output_gp[i].compute_predictive(true);
+
+                pred_mean_cache[i] = multi_output_gp[i].pred_mean;
+                dyn_cov_k_chol_cache[i] = arma::kron(
+                    multi_output_gp[i].pred_col_cov_chol,
+                    multi_output_gp[i].sigma_chol);
+
+                weights_cov_chol_cache[i] = chol_rank_n_update(
+                    meas_cov_chol, 1, des_mat * dyn_cov_k_chol_cache[i]);
+
+                weights_n(i) = logdnorm(
+                    y.col(t),
+                    meas_model(
+                        pred_mean_cache[i] + BZ,
+                        covariate_meas.col(t),
+                        des_mat, meas_covar),
+                    weights_cov_chol_cache[i]);
+            }
+
+            weights_n += log(weights.row(t - 1));
+            softmax(weights_n);
             ancestors.row(t - 1).subvec(0, n_particles - 2) =
-                systematic_resampling(weights.row(t - 1), n_particles - 1);
+                systematic_resampling(weights_n, n_particles - 1);
 
             // Calculate ancestor weights for reference particle
             for (arma::uword i = 0; i < n_particles; i++)
@@ -386,25 +416,17 @@ arma::mat pgas(
             // resample particles according to ancestor indices
             multi_output_gp = resample_std_vector(multi_output_gp,
                                                   ancestors.row(t - 1).t());
+            pred_mean_cache = resample_std_vector(pred_mean_cache,
+                                                  ancestors.row(t - 1).t());
+            dyn_cov_k_chol_cache = resample_std_vector(dyn_cov_k_chol_cache,
+                                                       ancestors.row(t - 1).t());
+            weights_cov_chol_cache = resample_std_vector(weights_cov_chol_cache,
+                                                         ancestors.row(t - 1).t());
 
             for (arma::uword i = 0; i < n_particles; i++)
             {
-                // For all particles except the reference particle
-                // make predictions for x_t
-                multi_output_gp[i].compute_predictive(true);
-                // dyn_cov_k = arma::kron(
-                //     multi_output_gp[i].pred_col_cov_chol *
-                //         multi_output_gp[i].pred_col_cov_chol.t(),
-                //     multi_output_gp[i].sigma);
-
-                dyn_cov_k_chol = arma::kron(
-                    multi_output_gp[i].pred_col_cov_chol,
-                    multi_output_gp[i].sigma_chol);
-
-                // weights_cov = des_mat * dyn_cov_k * des_mat.t() + meas_cov;
-
-                weights_cov_chol = chol_rank_n_update(
-                    meas_cov_chol, 1, des_mat * dyn_cov_k_chol);
+                dyn_cov_k_chol = dyn_cov_k_chol_cache[i];
+                weights_cov_chol = weights_cov_chol_cache[i];
 
                 // weights_cov_inv = inv_sympd(weights_cov);
                 // dyn_kalman_gain = dyn_cov_k * des_mat.t() *
@@ -422,18 +444,18 @@ arma::mat pgas(
                 // prop_cov_chol = chol(prop_cov, "lower");
                 BZ = lat_covar * covariate_dyn.col(t - 1);
                 y_pred = meas_model(
-                    multi_output_gp[i].pred_mean + BZ,
+                    pred_mean_cache[i] + BZ,
                     covariate_meas.col(t),
                     des_mat, meas_covar);
                 residuals = y.col(t) - y_pred;
 
-                // prop_mean = multi_output_gp[i].pred_mean + dyn_kalman_gain *residuals;
+                // prop_mean = pred_mean_cache[i] + dyn_kalman_gain *residuals;
 
                 arma::vec v =
                     solve(trimatu(weights_cov_chol.t()),
                           solve(trimatl(weights_cov_chol), residuals));
 
-                prop_mean = multi_output_gp[i].pred_mean + BZ +
+                prop_mean = pred_mean_cache[i] + BZ +
                             dyn_cov_k_chol * dyn_cov_k_chol.t() * des_mat.t() * v;
 
                 if (i < (n_particles - 1))
@@ -441,15 +463,13 @@ arma::mat pgas(
                     x.slice(t).col(i) = prop_cov_chol * arma::randn(d_lat);
                     x.slice(t).col(i) += prop_mean;
                 }
-
-                weights.row(t)(i) = logdnorm(
-                    y.col(t),
-                    des_mat * (multi_output_gp[i].pred_mean + BZ),
-                    weights_cov_chol);
             }
 
             // Set last particle state to state from the reference path
             x.slice(t).col(n_particles - 1) = x_ref.col(t); // X^N_(t+1)
+
+            // Fully adapted APF weights are constant after propagation.
+            weights.row(t).zeros();
 
             // Update GP posteriors to include newly sampled data ------
             // Add new predictions to particles

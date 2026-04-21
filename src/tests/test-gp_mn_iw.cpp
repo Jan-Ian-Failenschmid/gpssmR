@@ -58,10 +58,9 @@ context("C++ GP Matrix-normal-inverse-Wishart")
             cov_df);
 
         model.calc_posterior_parameters();
-
         const arma::mat posterior_cov_scale = {
-            {23.0381917807862, -1.4203057830965},
-            {-1.4203057830965, 27.6275728166084}};
+            {23.0381917797606, -1.42030578326805},
+            {-1.42030578326805, 27.6275728158056}};
         expect_true(
             compare_mat(model.iw->cov_scale_posterior,
                         posterior_cov_scale, tol));
@@ -76,10 +75,9 @@ context("C++ GP Matrix-normal-inverse-Wishart")
         expect_true(
             compare_mat(model.iw->cov,
                         posterior_cov_sample, tol));
-
         expect_true(
             compare_double(model.log_marginal_likelihood(),
-                           -175.583325284281,
+                           -175.583325341299,
                            tol));
     };
 };

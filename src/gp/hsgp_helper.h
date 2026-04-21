@@ -23,7 +23,10 @@ inline arma::vec gp_spdf_nd_vec(
 {
     // ||lambda||^2 for each row
     arma::vec norms = arma::sum(arma::square(Lambda), 1);
-    double scale = std::pow(alpha, 2) * std::sqrt(2 * M_PI) * rho;
+    const double dim = static_cast<double>(Lambda.n_cols);
+    const double scale =
+        std::pow(alpha, 2) *
+        std::pow(std::sqrt(2.0 * M_PI) * rho, dim);
     arma::vec result = scale * arma::exp(-0.5 * rho * rho * norms);
     return result;
 }

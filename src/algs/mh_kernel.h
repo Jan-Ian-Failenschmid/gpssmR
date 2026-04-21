@@ -19,6 +19,8 @@ struct mh_kernel
     double proposal_log_prior;
 
     double acceptance_rate;
+    double acceptance_rate_sum;
+    arma::uword acceptance_rate_n;
 
     arma::mat par_cov;
     arma::mat prop_cov;
@@ -50,6 +52,8 @@ struct mh_kernel
         const arma::uword &adapt_start_inp);
 
     void advance_iter();
+    void reset_acceptance_rate();
+    void finalize_acceptance_rate();
     void tune_proposal();
     void make_proposal();
     void mh_step();

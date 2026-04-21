@@ -70,7 +70,9 @@ context("C++ GP helpers")
         double alpha = 1.5;
         double rho = 0.75;
         arma::vec expected_spdf =
-            std::pow(alpha, 2) * std::sqrt(2.0 * M_PI) * rho *
+            std::pow(alpha, 2) *
+            std::pow(std::sqrt(2.0 * M_PI) * rho,
+                     static_cast<double>(expected_sqrt_lambda.n_cols)) *
             arma::exp(-0.5 * std::pow(rho, 2) *
                       arma::sum(arma::square(expected_sqrt_lambda), 1));
         expect_true(compare_mat(
