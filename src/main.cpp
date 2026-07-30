@@ -56,6 +56,22 @@ namespace
 } // namespace
 
 // [[Rcpp::export]]
+arma::mat hsgp_approx_sample(
+    const arma::mat &dyn_trans_mat,    // Dynamic transition matrix draw
+    const arma::vec &hyperparameters,  // GP hyperparameters, alpha and rho
+    const arma::mat &X,                // Input points, one point per column
+    const arma::mat &basis_fun_index,  // Basis function index
+    const arma::vec &boundry_factor)   // Boundry factor
+{
+    // Hyperparameters do not do anything here, 
+    hsgp_approx gp(basis_fun_index, boundry_factor);
+    gp.set_hyperparameters(hyperparameters[0], hyperparameters[1]);
+    gp.update_predictor(X);
+
+    return dyn_trans_mat * (*gp.get_predictor_ptr());
+}
+
+// [[Rcpp::export]]
 arma::mat gpssm_sample(
 
     const arma::uword &n_iter,      // Number of MCMC samples to be drawn

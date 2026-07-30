@@ -11,6 +11,21 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
+// hsgp_approx_sample
+arma::mat hsgp_approx_sample(const arma::mat& dyn_trans_mat, const arma::vec& hyperparameters, const arma::mat& X, const arma::mat& basis_fun_index, const arma::vec& boundry_factor);
+RcppExport SEXP _gpssmR_hsgp_approx_sample(SEXP dyn_trans_matSEXP, SEXP hyperparametersSEXP, SEXP XSEXP, SEXP basis_fun_indexSEXP, SEXP boundry_factorSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type dyn_trans_mat(dyn_trans_matSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type hyperparameters(hyperparametersSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type basis_fun_index(basis_fun_indexSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type boundry_factor(boundry_factorSEXP);
+    rcpp_result_gen = Rcpp::wrap(hsgp_approx_sample(dyn_trans_mat, hyperparameters, X, basis_fun_index, boundry_factor));
+    return rcpp_result_gen;
+END_RCPP
+}
 // gpssm_sample
 arma::mat gpssm_sample(const arma::uword& n_iter, const arma::uword& n_warm_up, const arma::uword& n_thin, const arma::uword& n_particles, const arma::uword& n_time, const arma::uword& d_lat, const arma::uword& d_obs, arma::mat y, arma::mat x, const arma::mat& covariate_dyn, const arma::mat& covariate_meas, const arma::vec& t0_mean, const arma::mat& t0_cov, const arma::mat& basis_fun_index, const arma::vec& boundry_factor, const Rcpp::Function& dprior, const Rcpp::Function& rprior, arma::mat dyn_design_mat_mean, const arma::mat dyn_covar_mat_mean, const arma::mat dyn_covar_mat_col_cov, const arma::uword& dyn_cov_df, const arma::mat& dyn_cov_scale, const arma::mat meas_design_mat_const, const arma::vec meas_design_mat_mean_alt, const arma::mat meas_design_mat_cov_alt, const arma::mat meas_covar_mat_const, const arma::vec meas_covar_mat_mean_alt, const arma::mat meas_covar_mat_cov_alt, const arma::uword& meas_cov_df, const arma::mat& meas_cov_scale, const arma::uword& mh_rep, const arma::uword& pg_rep, const arma::uword mh_adapt_start, bool exact, bool post_pred, bool disp_prog);
 RcppExport SEXP _gpssmR_gpssm_sample(SEXP n_iterSEXP, SEXP n_warm_upSEXP, SEXP n_thinSEXP, SEXP n_particlesSEXP, SEXP n_timeSEXP, SEXP d_latSEXP, SEXP d_obsSEXP, SEXP ySEXP, SEXP xSEXP, SEXP covariate_dynSEXP, SEXP covariate_measSEXP, SEXP t0_meanSEXP, SEXP t0_covSEXP, SEXP basis_fun_indexSEXP, SEXP boundry_factorSEXP, SEXP dpriorSEXP, SEXP rpriorSEXP, SEXP dyn_design_mat_meanSEXP, SEXP dyn_covar_mat_meanSEXP, SEXP dyn_covar_mat_col_covSEXP, SEXP dyn_cov_dfSEXP, SEXP dyn_cov_scaleSEXP, SEXP meas_design_mat_constSEXP, SEXP meas_design_mat_mean_altSEXP, SEXP meas_design_mat_cov_altSEXP, SEXP meas_covar_mat_constSEXP, SEXP meas_covar_mat_mean_altSEXP, SEXP meas_covar_mat_cov_altSEXP, SEXP meas_cov_dfSEXP, SEXP meas_cov_scaleSEXP, SEXP mh_repSEXP, SEXP pg_repSEXP, SEXP mh_adapt_startSEXP, SEXP exactSEXP, SEXP post_predSEXP, SEXP disp_progSEXP) {
@@ -99,6 +114,7 @@ END_RCPP
 RcppExport SEXP run_testthat_tests(SEXP);
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_gpssmR_hsgp_approx_sample", (DL_FUNC) &_gpssmR_hsgp_approx_sample, 5},
     {"_gpssmR_gpssm_sample", (DL_FUNC) &_gpssmR_gpssm_sample, 36},
     {"_gpssmR_gpssm_prior_sample", (DL_FUNC) &_gpssmR_gpssm_prior_sample, 28},
     {"run_testthat_tests", (DL_FUNC) &run_testthat_tests, 1},

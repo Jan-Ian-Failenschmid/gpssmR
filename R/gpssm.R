@@ -138,6 +138,25 @@ gpssm_mn_prior <- R6::R6Class("gpssm_mn_prior",
     },
     get_par_names = function() {
       private$par_names
+    },
+    set_par_vec = function(vec) {
+      stopifnot(is.numeric(vec), length(vec) == length(private$par_names))
+
+      if (inherits(vec, "draws")) {
+        vec <- posterior::subset_draws(vec, variable = private$par_names)
+        vec <- as.vector(posterior::as_draws_matrix(vec)[1, ])
+      } else if (is.data.frame(vec)) {
+        vec <- unlist(vec[private$par_names], use.names = FALSE)
+      } else if (is.numeric(vec) && !is.null(names(vec))) {
+        vec <- vec[private$par_names]
+      }
+
+      private$par_vec <- vec
+    },
+    set_par_vec_to_value = function() {
+      d <- private$dim
+      stopifnot(length(private$par_vec) == prod(d))
+      self$value <- matrix(private$par_vec, d[1], d[2])
     }
   )
 )
@@ -676,7 +695,7 @@ gpssm <- R6::R6Class("gpssm",
               self$dyn_cov_mat$get_par_names(),
               self$meas_design_mat$get_par_names(),
               self$meas_covariate_mat$get_par_names(),
-              self$meas_cov_mat$get_par_names(), 
+              self$meas_cov_mat$get_par_names(),
               "log_lik"
             )
             colnames(chain_sample) <- name_parts
@@ -752,7 +771,7 @@ gpssm <- R6::R6Class("gpssm",
               self$dyn_cov_mat$get_par_names(),
               self$meas_design_mat$get_par_names(),
               self$meas_covariate_mat$get_par_names(),
-              self$meas_cov_mat$get_par_names(), 
+              self$meas_cov_mat$get_par_names(),
               "log_lik"
             )
             colnames(chain_sample) <- name_parts
@@ -797,9 +816,10 @@ gpssm <- R6::R6Class("gpssm",
       for (i in seq_len(n_indicators)) {
         ## ---- Indicator samples ----
         indicator_names <- paste0("^", data_name, "\\[", i, ",")
-        var_names <- grep(indicator_names, 
-        posterior::variables(self$get_samples(prior)), 
-        value = TRUE)
+        var_names <- grep(indicator_names,
+          posterior::variables(self$get_samples(prior)),
+          value = TRUE
+        )
 
         samples_indicator <- posterior::as_draws_matrix(
           posterior::subset_draws(self$get_samples(prior), variable = var_names)
@@ -823,13 +843,15 @@ gpssm <- R6::R6Class("gpssm",
         ## Extract latent smooth if desired
         if (latent_smooth) {
           latent_names <- paste0("^", latent_name, "\\[", latent_smooth, ",")
-          var_names <- grep(latent_names, 
-          posterior::variables(self$get_samples(prior)), 
-          value = TRUE)
+          var_names <- grep(latent_names,
+            posterior::variables(self$get_samples(prior)),
+            value = TRUE
+          )
 
           samples_latent <- posterior::as_draws_matrix(
-            posterior::subset_draws(self$get_samples(prior), 
-            variable = var_names)
+            posterior::subset_draws(self$get_samples(prior),
+              variable = var_names
+            )
           )
 
           latent_df <- data.frame(
@@ -950,6 +972,73 @@ gpssm <- R6::R6Class("gpssm",
 
       print(p)
       return(p)
+    },
+    gp_pred = function(test_points,
+                       state_name = NULL,
+                       hyperparameter_names = NULL,
+                       coefficient_name = NULL,
+                       n_draws = 200,
+                       draws_idx = NULL,
+                       exact = FALSE) {
+      if (is.null(state_name)) {
+        state_name <- self$data$get_latent_name_vec()
+      }
+      if (is.null(hyperparameter_names)) {
+        hyperparameter_names <- self$hyperparameter_names
+      }
+      if (is.null(coefficient_name) && !exact) {
+        coefficient_name <- self$dyn_design_mat$get_par_names()
+      }
+
+      draws_mat <- posterior::as_draws_matrix(self$get_samples())
+      total_draws <- nrow(draws_mat)
+
+      if (!is.null(draws_idx)) {
+        draws_idx <- as.integer(draws_idx)
+        stopifnot(
+          length(draws_idx) > 0,
+          all(draws_idx >= 1),
+          all(draws_idx <= total_draws)
+        )
+      } else if (is.null(n_draws)) {
+        draws_idx <- seq_len(total_draws)
+      } else {
+        stopifnot(
+          length(n_draws) == 1,
+          n_draws >= 1,
+          n_draws <= total_draws
+        )
+        draws_idx <- sample(seq_len(total_draws), n_draws)
+      }
+
+      n_draws <- length(draws_idx)
+      draws_mat <- draws_mat[draws_idx, , drop = FALSE]
+
+      coefficient_draws <- draws_mat[, coefficient_name, drop = FALSE]
+      hyperparameter_draws <- draws_mat[, hyperparameter_names, drop = FALSE]
+
+      pred_list <- lapply(
+        seq_len(n_draws),
+        function(i, hyperparameters, coefficients) {
+          hyperparameters_i <- hyperparameters[i, ]
+          coefficient_i <- coefficients[i, ]
+          self$dyn_design_mat$set_par_vec(coefficient_i)
+          self$dyn_design_mat$set_par_vec_to_value()
+
+          gp_pred <- hsgp_approx_sample(
+            self$dyn_design_mat$value,
+            hyperparameters_i,
+            test_points,
+            self$basis_fun_index,
+            self$boundry_factor
+          )
+          as.vector(gp_pred)
+        },
+        hyperparameters = hyperparameter_draws,
+        coefficients = coefficient_draws
+      )
+
+      do.call(rbind, pred_list)
     }
   )
 )
