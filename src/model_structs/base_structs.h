@@ -4,6 +4,7 @@
 #include <RcppArmadillo.h>
 #include "pdfs.h"
 #include "linear_algebra.h"
+#include "kernel_helper.h"
 
 struct model_base
 {
@@ -80,6 +81,10 @@ struct regression_base
 
 struct gp_base
 {
+    std::shared_ptr<kernel_base> kernel;
+
+    gp_base(std::unique_ptr<kernel_base> kernel_) : 
+        kernel(std::move(kernel_)) {};
     virtual ~gp_base() = default;
 
     virtual void set_hyperparameters(double alpha, double rho) = 0;

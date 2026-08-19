@@ -287,6 +287,66 @@ gpssm_cov_mat <- R6::R6Class("gpssm_cov_mat",
 #     prior_scale = diag(2, 1)
 # )
 
+# Kernel -----------------------------------------------------------------------
+kernel <- R6::R6Class("kernel",
+  private = list(
+    constants = NULL,
+    n_pars = NULL,
+    par_vec = NULL,
+    par_names = NULL
+  ),
+  public = list(
+    name = NULL,
+    initialize = function(name = "squared_exponential", par_names = NULL) {
+      name <- match.arg(
+        name,
+        choices = c("squared_exponential", "matern12", "matern32", "matern52")
+      )
+      self$name <- name
+      if (is.null(par_names)) par_names <- c("alpha", "rho")
+
+      if (name == "squared_exponential") {
+        private$n_pars <- 2
+        private$par_vec <- numeric(2)
+        private$par_names <- par_names
+        private$constants <- numeric(0)
+      } else if (name %in% c("matern12", "matern32", "matern52")) {
+        private$n_pars <- 2
+        private$par_vec <- numeric(2)
+        private$par_names <- par_names
+        if (name == "matern12") {
+          private$constants <- c(.5)
+        } else if (name == "matern32") {
+          private$constants <- c(1.5)
+        } else if (name == "matern52") {
+          private$constants <- c(2.5)
+        }
+      }
+    },
+    get_constants = function() {
+      private$constants
+    },
+    get_par_vec = function() {
+      private$par_vec
+    },
+    get_n_pars = function() {
+      private$n_pars
+    },
+    get_par_names = function() {
+      private$par_names
+    },
+    get_kernel = function() {
+      list(
+        name = self$name,
+        constants = private$constants,
+        n_pars = private$n_pars,
+        par_names = private$par_names,
+        par_vec = private$par_vec
+      )
+    }
+  )
+)
+
 # Data class -------------------------------------------------------------------
 gpssm_data <- R6::R6Class("gpssm_data",
   private = list(
@@ -459,7 +519,7 @@ gpssm <- R6::R6Class("gpssm",
     data = NULL,
     basis_fun_index = NULL,
     boundry_factor = NULL,
-    hyperparameter_names = NULL,
+    kernel = NULL,
     gp_name_vec = NULL,
     dprior = NULL,
     rprior = NULL,
@@ -478,9 +538,10 @@ gpssm <- R6::R6Class("gpssm",
       }))
 
       self$data <- data
+      # GP
       self$basis_fun_index <- gp_model$basis_fun_index
       self$boundry_factor <- gp_model$boundry_factor
-      self$hyperparameter_names <- gp_model$hyperparameter_names
+      self$kernel <- gp_model$kernel
       self$gp_name_vec <- gp_name_vec
       self$dprior <- gp_model$dprior
       self$rprior <- gp_model$rprior
@@ -519,6 +580,7 @@ gpssm <- R6::R6Class("gpssm",
               basis_fun_index = self$basis_fun_index,
               boundry_factor = self$boundry_factor,
               rprior = self$rprior,
+              kernel = self$kernel$get_kernel(),
               dyn_design_mat_mean = self$dyn_design_mat$prior_mean,
               dyn_covar_mat_mean = self$dyn_covariate_mat$prior_mean,
               dyn_covar_mat_col_cov = self$dyn_covariate_mat$prior_col_cov,
@@ -543,7 +605,7 @@ gpssm <- R6::R6Class("gpssm",
               if (pred) self$data$get_data_name_vec(),
               self$data$get_latent_name_vec(),
               self$gp_name_vec,
-              self$hyperparameter_names,
+              self$kernel$get_par_names(),
               if (!exact) self$dyn_design_mat$get_par_names(),
               self$dyn_covariate_mat$get_par_names(),
               self$dyn_cov_mat$get_par_names(),
@@ -580,6 +642,7 @@ gpssm <- R6::R6Class("gpssm",
               basis_fun_index = self$basis_fun_index,
               boundry_factor = self$boundry_factor,
               rprior = self$rprior,
+              kernel = self$kernel$get_kernel(),
               dyn_design_mat_mean = self$dyn_design_mat$prior_mean,
               dyn_covar_mat_mean = self$dyn_covariate_mat$prior_mean,
               dyn_covar_mat_col_cov = self$dyn_covariate_mat$prior_col_cov,
@@ -604,7 +667,7 @@ gpssm <- R6::R6Class("gpssm",
               if (pred) self$data$get_data_name_vec(),
               self$data$get_latent_name_vec(),
               self$gp_name_vec,
-              self$hyperparameter_names,
+              self$kernel$get_par_names(),
               if (!exact) self$dyn_design_mat$get_par_names(),
               self$dyn_covariate_mat$get_par_names(),
               self$dyn_cov_mat$get_par_names(),
@@ -662,6 +725,7 @@ gpssm <- R6::R6Class("gpssm",
               boundry_factor = self$boundry_factor,
               dprior = self$dprior,
               rprior = self$rprior,
+              kernel = self$kernel$get_kernel(),
               dyn_design_mat_mean = self$dyn_design_mat$prior_mean,
               dyn_covar_mat_mean = self$dyn_covariate_mat$prior_mean,
               dyn_covar_mat_col_cov = self$dyn_covariate_mat$prior_col_cov,
@@ -689,7 +753,7 @@ gpssm <- R6::R6Class("gpssm",
               if (post_pred) self$data$get_data_name_vec(),
               self$data$get_latent_name_vec(),
               self$gp_name_vec,
-              self$hyperparameter_names,
+              self$kernel$get_par_names(),
               if (!exact) self$dyn_design_mat$get_par_names(),
               self$dyn_covariate_mat$get_par_names(),
               self$dyn_cov_mat$get_par_names(),
@@ -739,6 +803,7 @@ gpssm <- R6::R6Class("gpssm",
               boundry_factor = self$boundry_factor,
               dprior = self$dprior,
               rprior = self$rprior,
+              kernel = self$kernel$get_kernel(),
               dyn_design_mat_mean = self$dyn_design_mat$prior_mean,
               dyn_covar_mat_mean = self$dyn_covariate_mat$prior_mean,
               dyn_covar_mat_col_cov = self$dyn_covariate_mat$prior_col_cov,
@@ -765,7 +830,7 @@ gpssm <- R6::R6Class("gpssm",
               if (post_pred) self$data$get_data_name_vec(),
               self$data$get_latent_name_vec(),
               self$gp_name_vec,
-              self$hyperparameter_names,
+              self$kernel$get_par_names(),
               if (!exact) self$dyn_design_mat$get_par_names(),
               self$dyn_covariate_mat$get_par_names(),
               self$dyn_cov_mat$get_par_names(),
@@ -984,7 +1049,7 @@ gpssm <- R6::R6Class("gpssm",
         state_name <- self$data$get_latent_name_vec()
       }
       if (is.null(hyperparameter_names)) {
-        hyperparameter_names <- self$hyperparameter_names
+        hyperparameter_names <- self$kernel$get_par_names()
       }
       if (is.null(coefficient_name) && !exact) {
         coefficient_name <- self$dyn_design_mat$get_par_names()
@@ -1028,6 +1093,7 @@ gpssm <- R6::R6Class("gpssm",
           gp_pred <- hsgp_approx_sample(
             self$dyn_design_mat$value,
             hyperparameters_i,
+            self$kernel$get_kernel(),
             test_points,
             self$basis_fun_index,
             self$boundry_factor
@@ -1045,8 +1111,12 @@ gpssm <- R6::R6Class("gpssm",
 
 # Would probably be good to have these as seperate classes at some point !!!
 gpssm_gp <- function(
-    dprior, rprior, hyperparameter_names,
-    m_basis = NULL, c = NULL, S = NULL, gp_name = "gp") {
+  dprior, rprior, kernel_name = "squared_exponential",
+  hyperparameter_names = NULL,
+  m_basis = NULL, c = NULL, S = NULL, gp_name = "gp"
+) {
+  kernel <- kernel$new(name = kernel_name, par_names = hyperparameter_names)
+
   if (is.null(m_basis) & is.null(c) & is.null(S)) {
     exact <- TRUE
   } else if (!is.null(m_basis) & !is.null(c) & !is.null(S)) {
@@ -1078,7 +1148,7 @@ gpssm_gp <- function(
   list(
     basis_fun_index = as.matrix(basis_fun_index),
     boundry_factor = c * S,
-    hyperparameter_names = hyperparameter_names,
+    kernel = kernel,
     gp_name = gp_name,
     dprior = dprior_trans,
     rprior = rprior_tans,

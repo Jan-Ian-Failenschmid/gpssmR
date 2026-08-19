@@ -20,26 +20,30 @@ context("C++ IMC GP struct")
         x_test_full.row(0) = arma::rowvec({0.5, 1.5});
         arma::mat sigma = identity(1);
 
-        imc_gp gp_full;
+        imc_gp gp_full(std::make_unique<squared_exponential>());
+        gp_full.update_hyperparameters(1.5, 0.75);
         gp_full.update_train_data(x_train_full, y_train_full);
         gp_full.update_sigma(sigma);
         gp_full.set_train_y_cov_I();
         gp_full.update_test_data(x_test_full);
         gp_full.set_test_y_cov_I();
-        gp_full.update_hyperparameters(1.5, 0.75);
         gp_full.compute_predictive(true);
 
-        imc_gp gp_seq;
-        gp_seq.update_train_data(x_train_full.cols(0, 0), y_train_full.cols(0, 0));
+        imc_gp gp_seq(std::make_unique<squared_exponential>());
+        gp_seq.update_hyperparameters(1.5, 0.75);
+        gp_seq.update_train_data(
+            x_train_full.cols(0, 0), 
+            y_train_full.cols(0, 0));
         gp_seq.update_sigma(sigma);
         gp_seq.set_train_y_cov_I();
-        gp_seq.append_train_data(x_train_full.cols(1, 2), y_train_full.cols(1, 2));
+        gp_seq.append_train_data(
+            x_train_full.cols(1, 2), 
+            y_train_full.cols(1, 2));
         gp_seq.append_train_y_cov_I();
         gp_seq.update_test_data(x_test_full.cols(0, 0));
         gp_seq.set_test_y_cov_I();
         gp_seq.append_test_data(x_test_full.cols(1, 1));
         gp_seq.append_test_y_cov_I();
-        gp_seq.update_hyperparameters(1.5, 0.75);
         gp_seq.compute_predictive(true);
 
         expect_true(compare_mat(gp_seq.train_dat, gp_full.train_dat, tol));
@@ -55,8 +59,8 @@ context("C++ IMC GP struct")
         expect_true(compare_mat(gp_seq.pred_col_cov_chol, gp_full.pred_col_cov_chol, 1e-8));
 
         expect_true(compare_mat(
-            gp_full.kernel(x_train_full),
-            gp_full.kernel(x_train_full, x_train_full),
+            gp_full.kernel_mat(x_train_full),
+            gp_full.kernel_mat(x_train_full, x_train_full),
             tol));
         expect_true(compare_mat(
             gp_full.mu(x_test_full),

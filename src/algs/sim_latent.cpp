@@ -53,7 +53,7 @@ arma::mat sim_latent(
 {
     arma::mat x_sample(d_lat, n_time);
 
-    imc_gp multi_output_gp;
+    imc_gp multi_output_gp = gp;
 
     // Draw first latent variable value from its prior
     x_sample.col(0) = t0_mean + chol(t0_cov, "lower") *
@@ -115,7 +115,7 @@ std::pair<arma::mat, arma::mat> sim_latent_joined(
         lat_covar,
         dyn_cov);
 
-    imc_gp multi_output_gp;
+    imc_gp multi_output_gp = gp;
 
     multi_output_gp.update_hyperparameters(gp.alpha, gp.rho);
     multi_output_gp.update_sigma(dyn_cov);

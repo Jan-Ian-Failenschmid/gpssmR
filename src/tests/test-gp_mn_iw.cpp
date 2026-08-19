@@ -40,7 +40,9 @@ context("C++ GP Matrix-normal-inverse-Wishart")
         arma::mat cov_scale_chol = chol(cov_scale, "lower");
         arma::mat data_cov = identity(n);
 
-        auto gp = std::make_unique<imc_gp>();
+        auto gp = std::make_unique<imc_gp>(
+            std::make_unique<squared_exponential>()
+        );
         gp->set_hyperparameters(5.0, 1.0);
         gp->update_predictor(X);
 

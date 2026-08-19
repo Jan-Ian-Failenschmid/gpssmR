@@ -1,8 +1,8 @@
 // [[Rcpp::depends(RcppArmadillo)]]
 
 #include "imc_gp_struct.h"
-#include "imc_gp_helper.h"
 #include "linear_algebra.h"
+#include "kernel_helper.h"
 #include "pdfs.h"
 
 // Update functions
@@ -19,7 +19,7 @@ void imc_gp::update_train_data(const arma::mat &training_data_inp,
     dim_out = outcome_dat.n_rows;
 
     train_mu = mu(train_dat);
-    arma::mat train_k = kernel(train_dat);
+    arma::mat train_k = kernel_mat(train_dat);
     // train_k.diag() += 1;
     jitter_mat(train_k, delta);
 
@@ -30,8 +30,8 @@ void imc_gp::append_train_data(const arma::mat &training_data_inp,
                                const arma::mat &outcome_data_inp)
 {
     arma::mat mu_new_train = mu(training_data_inp);
-    arma::mat k_lower_block = kernel(training_data_inp, train_dat);
-    arma::mat k_lower_diag = kernel(training_data_inp);
+    arma::mat k_lower_block = kernel_mat(training_data_inp, train_dat);
+    arma::mat k_lower_diag = kernel_mat(training_data_inp);
     jitter_mat(k_lower_diag, delta);
 
     train_dat = join_rows(train_dat, training_data_inp);
@@ -50,7 +50,7 @@ void imc_gp::update_test_data(const arma::mat &test_data_inp)
     n_test = test_dat.n_cols;
 
     test_mu = mu(test_dat);
-    arma::mat test_k = kernel(test_dat);
+    arma::mat test_k = kernel_mat(test_dat);
     jitter_mat(test_k, delta);
     test_k_chol = chol(test_k, "lower");
 }
@@ -58,8 +58,8 @@ void imc_gp::update_test_data(const arma::mat &test_data_inp)
 void imc_gp::append_test_data(const arma::mat &test_data_inp)
 {
     arma::mat mu_new_test = mu(test_data_inp);
-    arma::mat test_lower_block = kernel(test_data_inp, test_dat);
-    arma::mat test_lower_diagonal = kernel(test_data_inp);
+    arma::mat test_lower_block = kernel_mat(test_data_inp, test_dat);
+    arma::mat test_lower_diagonal = kernel_mat(test_data_inp);
     jitter_mat(test_lower_diagonal, delta);
 
     test_dat = join_rows(test_dat, test_data_inp);
@@ -144,11 +144,11 @@ void imc_gp::update_hyperparameters(const double &alpha_inp,
     alpha = alpha_inp;
     rho = rho_inp;
 
-    arma::mat train_k = kernel(train_dat);
+    arma::mat train_k = kernel_mat(train_dat);
     jitter_mat(train_k, delta);
     train_k_chol = chol(train_k, "lower");
 
-    arma::mat test_k = kernel(test_dat);
+    arma::mat test_k = kernel_mat(test_dat);
     jitter_mat(test_k, delta);
     test_k_chol = chol(test_k, "lower");
 }
@@ -159,14 +159,16 @@ void imc_gp::update_sigma(const arma::mat &sigma_inp)
     sigma_chol = arma::chol(sigma, "lower");
 }
 
-arma::mat imc_gp::kernel(const arma::mat &x1, const arma::mat &x2)
+arma::mat imc_gp::kernel_mat(const arma::mat &x1, const arma::mat &x2)
 {
-    return gp_covariance_multi(x1, x2, rho, alpha);
+    // return gp_covariance_multi(x1, x2, rho, alpha);
+    return kernel->gp_covariance_multi(x1, x2, arma::vec({ alpha, rho }));
 }
 
-arma::mat imc_gp::kernel(const arma::mat &x1)
+arma::mat imc_gp::kernel_mat(const arma::mat &x1)
 {
-    return gp_covariance_multi(x1, rho, alpha);
+    return kernel->gp_covariance_multi(x1, arma::vec({ alpha, rho }));
+    // return gp_covariance_multi(x1, rho, alpha);
 }
 
 arma::mat imc_gp::mu(const arma::mat &x)
@@ -209,7 +211,7 @@ void imc_gp::compute_predictive(const bool &marginal)
 {
     // Calculate K^-1*K^T using L-T*L*-1*K^T
     // Solves throws warnings, use fast to avoid warnings, since K + I is PD
-    test_train_k = kernel(test_dat, train_dat);
+    test_train_k = kernel_mat(test_dat, train_dat);
     arma::mat L = get_marginal_train_cov_chol();
     arma::mat L_inv_k_T = chol_left_solve(L, test_train_k.t());
     arma::mat K_inv_k_T = arma::solve(arma::trimatu(L.t()),

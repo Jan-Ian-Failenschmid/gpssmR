@@ -48,8 +48,10 @@ context("C++ HSGP Matrix-normal-inverse-Wishart")
         arma::mat cov_scale_chol = chol(cov_scale, "lower");
         arma::mat data_cov = identity(n);
 
-        auto gp = std::make_unique<hsgp_approx>(basis_fun_index,
-                                                boundry_factor);
+        auto gp = std::make_unique<hsgp_approx>(
+            basis_fun_index,
+            boundry_factor, 
+            std::make_unique<squared_exponential>());
         gp->set_hyperparameters(5.0, 1.0);
         gp->update_predictor(X);
 

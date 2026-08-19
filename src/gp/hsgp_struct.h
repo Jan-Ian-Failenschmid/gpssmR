@@ -15,7 +15,10 @@ struct hsgp_approx : public gp_base
     double alpha;
     double rho;
 
-    hsgp_approx(arma::mat indices_inp, arma::vec boundry_factor_inp);
+    hsgp_approx(
+        arma::mat indices_inp, 
+        arma::vec boundry_factor_inp, 
+        std::unique_ptr<kernel_base> kernel_);
 
     void update_hyperparameters(const double &alpha_new, const double &rho_new);
     void phi_transform(const arma::mat &x);

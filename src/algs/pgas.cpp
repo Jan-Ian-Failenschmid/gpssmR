@@ -321,8 +321,7 @@ arma::mat pgas(
     // Set starting value of the N_th particle to reference value
     x.slice(0).col(n_particles - 1) = x_ref.col(0);
 
-    std::vector<imc_gp> multi_output_gp;
-    multi_output_gp.resize(n_particles);
+    std::vector<imc_gp> multi_output_gp(n_particles, gp);
     std::vector<arma::mat> pred_mean_cache(n_particles);
     std::vector<arma::mat> dyn_cov_k_chol_cache(n_particles);
     std::vector<arma::mat> weights_cov_chol_cache(n_particles);

@@ -11,6 +11,7 @@
 #include "main_helper.h"
 #include "sim_latent.h"
 #include "timer.h"
+#include "kernel_helper.h"
 #include <utility>
 
 using namespace Rcpp;
@@ -59,12 +60,14 @@ namespace
 arma::mat hsgp_approx_sample(
     const arma::mat &dyn_trans_mat,    // Dynamic transition matrix draw
     const arma::vec &hyperparameters,  // GP hyperparameters, alpha and rho
+    const Rcpp::List &kernel,
     const arma::mat &X,                // Input points, one point per column
     const arma::mat &basis_fun_index,  // Basis function index
     const arma::vec &boundry_factor)   // Boundry factor
 {
     // Hyperparameters do not do anything here, 
-    hsgp_approx gp(basis_fun_index, boundry_factor);
+    hsgp_approx gp(basis_fun_index, boundry_factor,
+        make_kernel(kernel));
     gp.set_hyperparameters(hyperparameters[0], hyperparameters[1]);
     gp.update_predictor(X);
 
@@ -94,6 +97,7 @@ arma::mat gpssm_sample(
     const arma::vec &boundry_factor,  // Boundry factor
     const Rcpp::Function &dprior,     // Hyperparameter log prior
     const Rcpp::Function &rprior,     // Hyperparameter rng
+    const Rcpp::List& kernel,
 
     arma::mat dyn_design_mat_mean,         // Internal matrix mean
     const arma::mat dyn_covar_mat_mean,    // Covariate matrix mean
@@ -166,13 +170,15 @@ arma::mat gpssm_sample(
     std::unique_ptr<gp_base> gp;
     if (exact)
     {
-        gp = std::make_unique<imc_gp>();
+        gp = std::make_unique<imc_gp>(
+            make_kernel(kernel)
+        );
         dyn_design_mat_mean.set_size(d_lat, n_time - 1);
     }
     else
     {
         gp = std::make_unique<hsgp_approx>(basis_fun_index,
-                                           boundry_factor);
+            boundry_factor, make_kernel(kernel));
         dyn_design_mat_mean.set_size(d_lat, basis_fun_index.n_rows);
     }
     gp->set_hyperparameters(
@@ -490,6 +496,7 @@ arma::mat gpssm_prior_sample(
     const arma::mat &basis_fun_index, // Basis function index
     const arma::vec &boundry_factor,  // Boundry factor
     const Rcpp::Function &rprior,     // Hyperparameter rng
+    const Rcpp::List &kernel,
 
     arma::mat dyn_design_mat_mean,         // Internal matrix mean
     const arma::mat dyn_covar_mat_mean,    // Covariate matrix mean
@@ -558,13 +565,15 @@ arma::mat gpssm_prior_sample(
     std::unique_ptr<gp_base> gp;
     if (exact)
     {
-        gp = std::make_unique<imc_gp>();
+        gp = std::make_unique<imc_gp>(make_kernel(kernel));
         dyn_design_mat_mean.set_size(d_lat, n_time - 1);
     }
     else
     {
-        gp = std::make_unique<hsgp_approx>(basis_fun_index,
-                                           boundry_factor);
+        gp = std::make_unique<hsgp_approx>(
+            basis_fun_index,
+            boundry_factor, 
+            make_kernel(kernel));
         dyn_design_mat_mean.set_size(d_lat, basis_fun_index.n_rows);
     }
     gp->set_hyperparameters(

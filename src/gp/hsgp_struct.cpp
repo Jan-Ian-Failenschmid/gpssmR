@@ -1,14 +1,16 @@
 // [[Rcpp::depends(RcppArmadillo)]]
 
 #include "hsgp_struct.h"
-#include "hsgp_helper.h"
+#include "kernel_helper.h"
 
 // Constructor
 hsgp_approx::hsgp_approx(
     arma::mat indices_inp,       // Matrix of indices in each dim
-    arma::vec boundry_factor_inp // Boundry factor in each dim
-    ) : indices(indices_inp), boundry_factor(boundry_factor_inp), alpha(),
-        rho(), spdf(), phi()
+    arma::vec boundry_factor_inp, // Boundry factor in each dim
+    std::unique_ptr<kernel_base> kernel_
+) : gp_base(std::move(kernel_)), indices(indices_inp), 
+    boundry_factor(boundry_factor_inp),
+    alpha(), rho(), spdf(), phi()
 {
     sqrt_lambda = gp_sqrt_lambda_nd_vec(boundry_factor.t(), indices);
 }
@@ -18,7 +20,8 @@ void hsgp_approx::update_hyperparameters(
 {
     alpha = alpha_new;
     rho = rho_new;
-    spdf = gp_spdf_nd_vec(sqrt_lambda, alpha, rho) + 1e-300;
+    spdf = kernel->gp_spdf_nd_vec(sqrt_lambda, arma::vec({alpha, rho})) +
+        1e-300;
 }
 
 void hsgp_approx::phi_transform(const arma::mat &x)

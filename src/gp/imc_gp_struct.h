@@ -47,6 +47,10 @@ struct imc_gp : public gp_base
 
     double delta = 1e-8;
 
+    imc_gp(std::unique_ptr<kernel_base> kernel_) :
+        gp_base(std::move(kernel_)), alpha(), rho(), train_norm_const(), 
+        log_lik(), marg_log_lik() {}
+
     void update_train_data(const arma::mat &training_data_inp,
                            const arma::mat &outcome_data_inp);
     void append_train_data(const arma::mat &training_data_inp,
@@ -57,8 +61,8 @@ struct imc_gp : public gp_base
     void update_hyperparameters(const double &alpha_inp,
                                 const double &rho_inp);
     void update_sigma(const arma::mat &sigma_inp);
-    arma::mat kernel(const arma::mat &x1, const arma::mat &x2);
-    arma::mat kernel(const arma::mat &x1);
+    arma::mat kernel_mat(const arma::mat &x1, const arma::mat &x2);
+    arma::mat kernel_mat(const arma::mat& x1);
     arma::mat mu(const arma::mat &x);
     double marginal_log_likelihood();
     double test_marginal_log_likelihood(const arma::mat &test_outcome);
