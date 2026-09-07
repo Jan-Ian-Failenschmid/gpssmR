@@ -10,14 +10,14 @@ mn_iw_model_ init_mn_iw_model(
     arma::mat &data_cov,
     mn_covar_wrapper &model_wrapper,
     arma::mat &cov_scale_chol,
-    double cov_df);
+    const Rcpp::List& dyn_cov_list);
 
 mvn_iw_model_ init_mvn_iw_model(
     arma::mat &Y,
     arma::mat &data_mean,
     mvn_covar_wrapper &model_wrapper,
     arma::mat &cov_scale_chol,
-    double cov_df);
+    const Rcpp::List& meas_cov_list);
 
 void update_model_hyperparameters(
     const arma::vec &hyperparameters,

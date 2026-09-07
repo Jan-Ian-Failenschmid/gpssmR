@@ -37,7 +37,7 @@ context("C++ GP Matrix-normal-inverse-Wishart")
         arma::mat data_mean = Y;
         data_mean.zeros();
         arma::mat covar_col_cov_chol = chol(covar_prior_col_cov, "lower");
-        arma::mat cov_scale_chol = chol(cov_scale, "lower");
+        arma::mat cov_scale_chol;
         arma::mat data_cov = identity(n);
 
         auto gp = std::make_unique<imc_gp>(
@@ -51,21 +51,29 @@ context("C++ GP Matrix-normal-inverse-Wishart")
             &dyn_mat_mean, &covar_mat_mean,
             gp->get_cov_chol_ptr(), &covar_col_cov_chol);
 
+        const Rcpp::List cov_list = Rcpp::List::create(
+            _["prior_scale"] = cov_scale,
+            _["prior_df"] = cov_df,
+            _["is_fixed"] = false
+        );
+
         mn_iw_model_ model = init_mn_iw_model(
             Y,
             data_mean,
             data_cov,
             model_wrapper,
             cov_scale_chol,
-            cov_df);
+            cov_list);
 
         model.calc_posterior_parameters();
         const arma::mat posterior_cov_scale = {
             {23.0381917797606, -1.42030578326805},
             {-1.42030578326805, 27.6275728158056}};
-        expect_true(
-            compare_mat(model.iw->cov_scale_posterior,
-                        posterior_cov_scale, tol));
+
+        expect_true(compare_mat(
+            dynamic_cast<iw_base*>(model.covariance.get())->cov_scale_posterior,
+            posterior_cov_scale, tol)
+        );
 
         set_r_seed(2);
         model.sample_posterior();
@@ -75,7 +83,7 @@ context("C++ GP Matrix-normal-inverse-Wishart")
             {-0.236486515430326, 0.883150965865179}};
 
         expect_true(
-            compare_mat(model.iw->cov,
+            compare_mat(model.covariance->cov,
                         posterior_cov_sample, tol));
         expect_true(
             compare_double(model.log_marginal_likelihood(),

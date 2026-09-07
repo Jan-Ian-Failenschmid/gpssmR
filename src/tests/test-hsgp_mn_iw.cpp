@@ -45,7 +45,7 @@ context("C++ HSGP Matrix-normal-inverse-Wishart")
         dyn_mat_mean.zeros();
 
         arma::mat covar_col_cov_chol = chol(covar_prior_col_cov, "lower");
-        arma::mat cov_scale_chol = chol(cov_scale, "lower");
+        arma::mat cov_scale_chol;
         arma::mat data_cov = identity(n);
 
         auto gp = std::make_unique<hsgp_approx>(
@@ -60,13 +60,19 @@ context("C++ HSGP Matrix-normal-inverse-Wishart")
             &dyn_mat_mean, &covar_mat_mean,
             gp->get_cov_chol_ptr(), &covar_col_cov_chol);
 
+        const Rcpp::List cov_list = Rcpp::List::create(
+            _["prior_scale"] = cov_scale,
+            _["prior_df"] = cov_df,
+            _["is_fixed"] = false
+        );
+
         mn_iw_model_ model = init_mn_iw_model(
             Y,
             data_mean,
             data_cov,
             model_wrapper,
             cov_scale_chol,
-            cov_df);
+            cov_list);
 
         model.calc_posterior_parameters();
 
@@ -118,7 +124,7 @@ context("C++ HSGP Matrix-normal-inverse-Wishart")
         const arma::mat posterior_cov_sample = {
             {0.567486334910915, -0.286084572113365},
             {-0.286084572113365, 1.15825209030833}};
-        expect_true(compare_mat(model.iw->get_cov(),
+        expect_true(compare_mat(model.covariance->get_cov(),
                                 posterior_cov_sample, tol));
 
         const arma::mat mn_param_sample = {

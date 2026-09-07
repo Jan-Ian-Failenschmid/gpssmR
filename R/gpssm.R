@@ -140,8 +140,6 @@ gpssm_mn_prior <- R6::R6Class("gpssm_mn_prior",
       private$par_names
     },
     set_par_vec = function(vec) {
-      stopifnot(is.numeric(vec), length(vec) == length(private$par_names))
-
       if (inherits(vec, "draws")) {
         vec <- posterior::subset_draws(vec, variable = private$par_names)
         vec <- as.vector(posterior::as_draws_matrix(vec)[1, ])
@@ -150,6 +148,8 @@ gpssm_mn_prior <- R6::R6Class("gpssm_mn_prior",
       } else if (is.numeric(vec) && !is.null(names(vec))) {
         vec <- vec[private$par_names]
       }
+
+      stopifnot(is.numeric(vec), length(vec) == length(private$par_names))
 
       private$par_vec <- vec
     },
@@ -232,35 +232,98 @@ gpssm_mvn_prior <- R6::R6Class("gpssm_mvn_prior",
 # )
 
 # Covariance matrix ------------------------------------------------------------
-gpssm_cov_mat <- R6::R6Class("gpssm_cov_mat",
+gpssm_cov_mat <- R6::R6Class(
+  "gpssm_cov_mat",
   private = list(
     dim = NULL,
     par_vec = NULL,
-    par_names = NULL
+    par_names = NULL,
+    type = NULL
   ),
   public = list(
     name = NULL,
     value = NULL,
     prior_df = NULL,
     prior_scale = NULL,
-    initialize = function(name, prior_df, prior_scale) {
-      stopifnot(is.character(name), length(name) == 1, nchar(name) > 0)
-      stopifnot(is.numeric(prior_df), length(prior_df) == 1)
-      stopifnot(is.matrix(prior_scale), nrow(prior_scale) == ncol(prior_scale))
-      stopifnot(is_psd_chol(prior_scale))
+    initialize = function(name,
+                          prior_df = NULL,
+                          prior_scale = NULL,
+                          value = NULL) {
+      # General specification
+      if (!is.null(value)) {
+        if (!is.null(prior_df) || !is.null(prior_scale)) {
+          warning(
+            "'value' was supplied, so the covariance is treated as fixed; ",
+            "'prior_df' and 'prior_scale' are ignored.",
+            call. = FALSE
+          )
+        }
 
-      private$dim <- nrow(prior_scale)
-      stopifnot(prior_df >= private$dim)
+        type <- "fixed"
+      } else {
+        if (is.null(prior_df) || is.null(prior_scale)) {
+          stop(
+            "Specify either 'value' for a fixed covariance, or both ",
+            "'prior_df' and 'prior_scale' for an Inverse-Wishart covariance.",
+            call. = FALSE
+          )
+        }
+
+        type <- "free"
+      }
+
+      stopifnot(
+        is.character(name),
+        length(name) == 1L,
+        nzchar(name)
+      )
 
       self$name <- name
-      self$prior_df <- prior_df
-      self$prior_scale <- prior_scale
+      private$type <- type
 
-      self$value <- diag(1, private$dim)
+      # Free covariance
+      if (type == "free") {
+        stopifnot(
+          is.numeric(prior_df),
+          length(prior_df) == 1L,
+          is.finite(prior_df),
+          is.matrix(prior_scale),
+          nrow(prior_scale) == ncol(prior_scale),
+          is_psd_chol(prior_scale)
+        )
+
+        private$dim <- nrow(prior_scale)
+
+        stopifnot(
+          prior_df >= private$dim
+        )
+
+        self$prior_df <- prior_df
+        self$prior_scale <- prior_scale
+        self$value <- diag(private$dim)
+      }
+
+      # Fixed covariance
+      if (type == "fixed") {
+        stopifnot(
+          is.matrix(value),
+          nrow(value) == ncol(value),
+          is_psd_chol(value)
+        )
+
+        private$dim <- nrow(value)
+
+        self$value <- value
+        self$prior_df <- 0
+        self$prior_scale <- diag(1, private$dim)
+      }
+
+      # Parameter representation
       private$par_vec <- as.vector(self$value)
-      idx <- expand.grid(i = 1:private$dim, j = 1:private$dim)
+      idx <- expand.grid(i = seq_len(private$dim), j = seq_len(private$dim))
       private$par_names <- apply(
-        idx, 1,
+        idx,
+        1,
         function(x) paste0(name, "[", x[1], ",", x[2], "]")
       )
     },
@@ -277,6 +340,22 @@ gpssm_cov_mat <- R6::R6Class("gpssm_cov_mat",
     },
     get_par_names = function() {
       private$par_names
+    },
+    get_type = function() {
+      private$type
+    },
+    get_covariance = function() {
+      list(
+        name = self$name,
+        value = self$value,
+        prior_df = self$prior_df,
+        prior_scale = self$prior_scale,
+        prior_scale_chol = t(chol(self$prior_scale)),
+        is_fixed = private$type == "fixed"
+      )
+    },
+    is_fixed = function() {
+      private$type == "fixed"
     }
   )
 )
@@ -584,16 +663,14 @@ gpssm <- R6::R6Class("gpssm",
               dyn_design_mat_mean = self$dyn_design_mat$prior_mean,
               dyn_covar_mat_mean = self$dyn_covariate_mat$prior_mean,
               dyn_covar_mat_col_cov = self$dyn_covariate_mat$prior_col_cov,
-              dyn_cov_df = self$dyn_cov_mat$prior_df,
-              dyn_cov_scale = self$dyn_cov_mat$prior_scale,
+              dyn_cov_list = self$dyn_cov_mat$get_covariance(),
               meas_design_mat_const = self$meas_design_mat$constraint,
               meas_design_mat_mean_alt = self$meas_design_mat$prior_mean,
               meas_design_mat_cov_alt = self$meas_design_mat$prior_cov,
               meas_covar_mat_const = self$meas_covariate_mat$constraint,
               meas_covar_mat_mean_alt = self$meas_covariate_mat$prior_mean,
               meas_covar_mat_cov_alt = self$meas_covariate_mat$prior_cov,
-              meas_cov_df = self$meas_cov_mat$prior_df,
-              meas_cov_scale = self$meas_cov_mat$prior_scale,
+              meas_cov_list = self$meas_cov_mat$get_covariance(),
               y = y_test,
               exact = exact,
               pred = pred,
@@ -646,16 +723,14 @@ gpssm <- R6::R6Class("gpssm",
               dyn_design_mat_mean = self$dyn_design_mat$prior_mean,
               dyn_covar_mat_mean = self$dyn_covariate_mat$prior_mean,
               dyn_covar_mat_col_cov = self$dyn_covariate_mat$prior_col_cov,
-              dyn_cov_df = self$dyn_cov_mat$prior_df,
-              dyn_cov_scale = self$dyn_cov_mat$prior_scale,
+              dyn_cov_list = self$dyn_cov_mat$get_covariance(),
               meas_design_mat_const = self$meas_design_mat$constraint,
               meas_design_mat_mean_alt = self$meas_design_mat$prior_mean,
               meas_design_mat_cov_alt = self$meas_design_mat$prior_cov,
               meas_covar_mat_const = self$meas_covariate_mat$constraint,
               meas_covar_mat_mean_alt = self$meas_covariate_mat$prior_mean,
               meas_covar_mat_cov_alt = self$meas_covariate_mat$prior_cov,
-              meas_cov_df = self$meas_cov_mat$prior_df,
-              meas_cov_scale = self$meas_cov_mat$prior_scale,
+              meas_cov_list = self$meas_cov_mat$get_covariance(),
               y = y_test,
               exact = exact,
               pred = pred,
@@ -729,16 +804,14 @@ gpssm <- R6::R6Class("gpssm",
               dyn_design_mat_mean = self$dyn_design_mat$prior_mean,
               dyn_covar_mat_mean = self$dyn_covariate_mat$prior_mean,
               dyn_covar_mat_col_cov = self$dyn_covariate_mat$prior_col_cov,
-              dyn_cov_df = self$dyn_cov_mat$prior_df,
-              dyn_cov_scale = self$dyn_cov_mat$prior_scale,
+              dyn_cov_list = self$dyn_cov_mat$get_covariance(),
               meas_design_mat_const = self$meas_design_mat$constraint,
               meas_design_mat_mean_alt = self$meas_design_mat$prior_mean,
               meas_design_mat_cov_alt = self$meas_design_mat$prior_cov,
               meas_covar_mat_const = self$meas_covariate_mat$constraint,
               meas_covar_mat_mean_alt = self$meas_covariate_mat$prior_mean,
               meas_covar_mat_cov_alt = self$meas_covariate_mat$prior_cov,
-              meas_cov_df = self$meas_cov_mat$prior_df,
-              meas_cov_scale = self$meas_cov_mat$prior_scale,
+              meas_cov_list = self$meas_cov_mat$get_covariance(),
               mh_rep = mh_rep,
               pg_rep = pg_rep,
               mh_adapt_start = mh_adapt_start,
@@ -807,16 +880,14 @@ gpssm <- R6::R6Class("gpssm",
               dyn_design_mat_mean = self$dyn_design_mat$prior_mean,
               dyn_covar_mat_mean = self$dyn_covariate_mat$prior_mean,
               dyn_covar_mat_col_cov = self$dyn_covariate_mat$prior_col_cov,
-              dyn_cov_df = self$dyn_cov_mat$prior_df,
-              dyn_cov_scale = self$dyn_cov_mat$prior_scale,
+              dyn_cov_list = self$dyn_cov_mat$get_covariance(),
               meas_design_mat_const = self$meas_design_mat$constraint,
               meas_design_mat_mean_alt = self$meas_design_mat$prior_mean,
               meas_design_mat_cov_alt = self$meas_design_mat$prior_cov,
               meas_covar_mat_const = self$meas_covariate_mat$constraint,
               meas_covar_mat_mean_alt = self$meas_covariate_mat$prior_mean,
               meas_covar_mat_cov_alt = self$meas_covariate_mat$prior_cov,
-              meas_cov_df = self$meas_cov_mat$prior_df,
-              meas_cov_scale = self$meas_cov_mat$prior_scale,
+              meas_cov_list = self$meas_cov_mat$get_covariance(),
               mh_rep = mh_rep,
               pg_rep = pg_rep,
               mh_adapt_start = mh_adapt_start,
@@ -1039,15 +1110,21 @@ gpssm <- R6::R6Class("gpssm",
       return(p)
     },
     gp_pred = function(test_points,
-                       state_name = NULL,
                        hyperparameter_names = NULL,
                        coefficient_name = NULL,
-                       n_draws = 200,
+                       n_draws = NULL,
                        draws_idx = NULL,
                        exact = FALSE) {
-      if (is.null(state_name)) {
-        state_name <- self$data$get_latent_name_vec()
+      if (exact) {
+        stop("Exact predictions are currently not supported.")
       }
+
+      # State name is currently not used, but could be used at some
+      # point to subset test_points from draws.
+      # if (is.null(state_name)) {
+      #   state_name <- self$data$get_latent_name_vec()
+      # }
+
       if (is.null(hyperparameter_names)) {
         hyperparameter_names <- self$kernel$get_par_names()
       }
@@ -1059,11 +1136,12 @@ gpssm <- R6::R6Class("gpssm",
       total_draws <- nrow(draws_mat)
 
       if (!is.null(draws_idx)) {
-        draws_idx <- as.integer(draws_idx)
         stopifnot(
           length(draws_idx) > 0,
+          all(is.finite(draws_idx)),
           all(draws_idx >= 1),
-          all(draws_idx <= total_draws)
+          all(draws_idx <= total_draws),
+          all(draws_idx == as.integer(draws_idx))
         )
       } else if (is.null(n_draws)) {
         draws_idx <- seq_len(total_draws)
@@ -1071,7 +1149,9 @@ gpssm <- R6::R6Class("gpssm",
         stopifnot(
           length(n_draws) == 1,
           n_draws >= 1,
-          n_draws <= total_draws
+          n_draws <= total_draws,
+          is.finite(n_draws),
+          n_draws == as.integer(n_draws)
         )
         draws_idx <- sample(seq_len(total_draws), n_draws)
       }

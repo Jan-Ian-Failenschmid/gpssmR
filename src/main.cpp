@@ -102,8 +102,7 @@ arma::mat gpssm_sample(
     arma::mat dyn_design_mat_mean,         // Internal matrix mean
     const arma::mat dyn_covar_mat_mean,    // Covariate matrix mean
     const arma::mat dyn_covar_mat_col_cov, // Covariate matrix covariance
-    const arma::uword &dyn_cov_df,         // Prior df dyn_cov
-    const arma::mat &dyn_cov_scale,        // Prior scale dyn_cov
+    const Rcpp::List& dyn_cov_list,          // Measurement covariance params
 
     const arma::mat meas_design_mat_const,    // Internal matrix constraint
     const arma::vec meas_design_mat_mean_alt, // Alternative prior formulation
@@ -111,9 +110,7 @@ arma::mat gpssm_sample(
     const arma::mat meas_covar_mat_const,     // Covariate matrix mean
     const arma::vec meas_covar_mat_mean_alt,  // Alternative prior formulation
     const arma::mat meas_covar_mat_cov_alt,   // Alternative prior formulation
-    const arma::uword &meas_cov_df,           // Prior df dyn_cov
-    const arma::mat &meas_cov_scale,          // Prior scale dyn_cov
-
+    const Rcpp::List& meas_cov_list,          // Measurement covariance params
     const arma::uword &mh_rep,
     const arma::uword &pg_rep,
 
@@ -157,7 +154,7 @@ arma::mat gpssm_sample(
     // Measurement model parameters
     arma::mat meas_design_mat_cov_chol = chol(meas_design_mat_cov_alt, "lower");
     arma::mat meas_covar_mat_cov_chol = chol(meas_covar_mat_cov_alt, "lower");
-    arma::mat meas_cov_scale_chol = chol(meas_cov_scale, "lower");
+    arma::mat meas_cov_scale_chol;
 
     mvn_covar_wrapper meas_model_wrapper(
         &x, &covariate_meas,
@@ -185,7 +182,7 @@ arma::mat gpssm_sample(
         std::exp(hyperparameters[0]), std::exp(hyperparameters[1]));
     gp->update_predictor(x_pred);
     arma::mat dyn_covar_mat_cov_chol = chol(dyn_covar_mat_col_cov, "lower");
-    arma::mat dyn_cov_scale_chol = chol(dyn_cov_scale, "lower");
+    arma::mat dyn_cov_scale_chol;
     dyn_design_mat_mean.zeros();
 
     mn_covar_wrapper dyn_model_wrapper(
@@ -199,7 +196,7 @@ arma::mat gpssm_sample(
         y_mean,
         meas_model_wrapper,
         meas_cov_scale_chol,
-        meas_cov_df);
+        meas_cov_list);
 
     mn_iw_model_ dyn_model = init_mn_iw_model(
         x_out,
@@ -207,7 +204,7 @@ arma::mat gpssm_sample(
         x_cov_chol,
         dyn_model_wrapper,
         dyn_cov_scale_chol,
-        dyn_cov_df);
+        dyn_cov_list);
 
     arma::vec par_vec;
     arma::vec log_lik_vec(1);
@@ -501,8 +498,7 @@ arma::mat gpssm_prior_sample(
     arma::mat dyn_design_mat_mean,         // Internal matrix mean
     const arma::mat dyn_covar_mat_mean,    // Covariate matrix mean
     const arma::mat dyn_covar_mat_col_cov, // Covariate matrix covariance
-    const arma::uword &dyn_cov_df,         // Prior df dyn_cov
-    const arma::mat &dyn_cov_scale,        // Prior scale dyn_cov
+    const Rcpp::List& dyn_cov_list,          // Measurement covariance params
 
     const arma::mat meas_design_mat_const,    // Internal matrix constraint
     const arma::vec meas_design_mat_mean_alt, // Alternative prior formulation
@@ -510,8 +506,7 @@ arma::mat gpssm_prior_sample(
     const arma::mat meas_covar_mat_const,     // Covariate matrix mean
     const arma::vec meas_covar_mat_mean_alt,  // Alternative prior formulation
     const arma::mat meas_covar_mat_cov_alt,   // Alternative prior formulation
-    const arma::uword &meas_cov_df,           // Prior df dyn_cov
-    const arma::mat &meas_cov_scale,          // Prior scale dyn_cov
+    const Rcpp::List& meas_cov_list,          // Measurement covariance params
 
     const arma::mat &y,
     bool exact = false,
@@ -553,7 +548,7 @@ arma::mat gpssm_prior_sample(
     // Measurement model parameters
     arma::mat meas_design_mat_cov_chol = chol(meas_design_mat_cov_alt, "lower");
     arma::mat meas_covar_mat_cov_chol = chol(meas_covar_mat_cov_alt, "lower");
-    arma::mat meas_cov_scale_chol = chol(meas_cov_scale, "lower");
+    arma::mat meas_cov_scale_chol;
 
     mvn_covar_wrapper meas_model_wrapper(
         &x, &covariate_meas,
@@ -581,7 +576,7 @@ arma::mat gpssm_prior_sample(
     gp->update_predictor(x_pred);
 
     arma::mat dyn_covar_mat_cov_chol = chol(dyn_covar_mat_col_cov, "lower");
-    arma::mat dyn_cov_scale_chol = chol(dyn_cov_scale, "lower");
+    arma::mat dyn_cov_scale_chol;
     dyn_design_mat_mean.zeros();
     mn_covar_wrapper dyn_model_wrapper(
         gp->get_predictor_ptr(), &covariate_pred,
@@ -594,7 +589,7 @@ arma::mat gpssm_prior_sample(
         y_mean,
         meas_model_wrapper,
         meas_cov_scale_chol,
-        meas_cov_df);
+        meas_cov_list);
 
     mn_iw_model_ dyn_model = init_mn_iw_model(
         x_out,
@@ -602,7 +597,7 @@ arma::mat gpssm_prior_sample(
         x_cov_chol,
         dyn_model_wrapper,
         dyn_cov_scale_chol,
-        dyn_cov_df);
+        dyn_cov_list);
 
     arma::vec par_vec;
     arma::vec log_lik_vec(1);

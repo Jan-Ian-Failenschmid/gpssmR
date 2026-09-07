@@ -12,19 +12,32 @@ mn_iw_model_ init_mn_iw_model(
     arma::mat &data_cov,
     mn_covar_wrapper &model_wrapper,
     arma::mat &cov_scale_chol,
-    double cov_df)
+    const Rcpp::List& dyn_cov_list)
 {
-    auto iw = std::make_unique<iw_model_conjugate>(cov_df, &cov_scale_chol);
+    std::unique_ptr<covariance_base> covariance;
+
+    if (Rcpp::as<bool>(dyn_cov_list["is_fixed"]))
+    {
+        covariance = std::make_unique<fixed_covariance>(
+            Rcpp::as<arma::mat>(dyn_cov_list["value"])
+        );
+    } else {
+        cov_scale_chol = chol(Rcpp::as<arma::mat>(
+            dyn_cov_list["prior_scale"]), "lower");
+        covariance = std::make_unique<iw_model_conjugate>(
+            Rcpp::as<arma::uword>(dyn_cov_list["prior_df"]),
+            &cov_scale_chol);
+    }
 
     auto mn = std::make_unique<mn_regression_model>(
         model_wrapper.get_mean_ptr(),
         model_wrapper.get_prior_cov_chol_ptr(),
-        iw->get_cov_chol_ptr());
+        covariance->get_cov_chol_ptr());
 
     mn->set_predictor(model_wrapper.get_data_ptr());
     model_wrapper.set_param_ptr(mn->get_coefficient_ptr());
 
-    mn_iw_model_ model(std::move(mn), std::move(iw));
+    mn_iw_model_ model(std::move(mn), std::move(covariance));
 
     model.set_outcome(&Y);
     model.set_likelihood_pars(&data_mean, &data_cov);
@@ -37,9 +50,24 @@ mvn_iw_model_ init_mvn_iw_model(
     arma::mat &data_mean,
     mvn_covar_wrapper &model_wrapper,
     arma::mat &cov_scale_chol,
-    double cov_df)
+    const Rcpp::List& meas_cov_list
+)
 {
-    auto iw = std::make_unique<iw_model_>(cov_df, &cov_scale_chol);
+    std::unique_ptr<covariance_base> covariance;
+
+    if (Rcpp::as<bool>(meas_cov_list["is_fixed"]))
+    {
+        covariance = std::make_unique<fixed_covariance>(
+            Rcpp::as<arma::mat>(meas_cov_list["value"])
+        );
+    }
+    else {
+        cov_scale_chol = chol(Rcpp::as<arma::mat>(
+            meas_cov_list["prior_scale"]), "lower");
+        covariance = std::make_unique<iw_model_>(
+            Rcpp::as<arma::uword>(meas_cov_list["prior_df"]),
+            &cov_scale_chol);
+    }
 
     auto mvn = std::make_unique<mvn_regression_model_>(
         model_wrapper.get_mean_ptr(),
@@ -49,7 +77,7 @@ mvn_iw_model_ init_mvn_iw_model(
     mvn->set_predictor(model_wrapper.get_data_ptr());
     model_wrapper.set_param_ptr(mvn->get_coefficient_ptr());
 
-    mvn_iw_model_ model(std::move(mvn), std::move(iw));
+    mvn_iw_model_ model(std::move(mvn), std::move(covariance));
 
     model.set_outcome(&Y);
     model.set_likelihood_pars(&data_mean);

@@ -37,6 +37,7 @@ void hsgp_approx::phi_transform(const arma::mat &x)
 
 arma::mat hsgp_approx::scaled_basis_functions(const arma::mat &x)
 {
+    // Scalign should be by sqrt spdf??? ---------------------------------------
     phi_transform(x);
     return arma::diagmat(spdf) * phi;
 }

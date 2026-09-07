@@ -78,71 +78,86 @@
 
 struct mn_iw_model_ : public model_base
 {
-    std::unique_ptr<iw_model_conjugate> iw;
+    std::unique_ptr<covariance_base> covariance;
     std::unique_ptr<mn_regression_model> mn;
 
+    mn_conjugate_covariance* conjugate_covariance = nullptr;
+
     mn_iw_model_(std::unique_ptr<mn_regression_model> mn_model_,
-                 std::unique_ptr<iw_model_conjugate> iw_model_)
-        : iw(std::move(iw_model_)),
+        std::unique_ptr<covariance_base> covariance_model_)
+        : covariance(std::move(covariance_model_)),
           mn(std::move(mn_model_))
     {
         // iw->data_mean = mn->get_marginal_mean_ptr();
         // iw->data_cov_chol = mn->get_marginal_cov_chol_ptr();
-        iw->set_mn_prior_pointers(
-            mn->coefficient_prior,
-            mn->col_cov_prior_chol,
-            &mn->col_cov_prior_inv);
-        iw->set_mn_posterior_pointers(
-            &mn->coefficient_posterior,
-            &mn->col_cov_posterior_chol,
-            &mn->col_cov_posterior_inv);
+        mn->set_row_cov(covariance->get_cov_chol_ptr());
+     
+        if (!covariance->is_fixed()) {
+            // If covariance is not fixed check if covariance is conjugate
+            conjugate_covariance =
+                dynamic_cast<mn_conjugate_covariance*>(covariance.get());
 
-        mn->set_row_cov(iw->get_cov_chol_ptr());
+            conjugate_covariance->set_mn_prior_pointers(
+                mn->coefficient_prior,
+                mn->col_cov_prior_chol,
+                &mn->col_cov_prior_inv);
+
+            conjugate_covariance->set_mn_posterior_pointers(
+                &mn->coefficient_posterior,
+                &mn->col_cov_posterior_chol,
+                &mn->col_cov_posterior_inv);
+        }
     }
 
     void calc_posterior_parameters() override
     {
         mn->calc_posterior_parameters();
         // mn->calc_marginal_parameters();
-        iw->calc_posterior_parameters();
+        covariance->calc_posterior_parameters();
     }
 
     void sample_prior() override
     {
-        iw->sample_prior();
+        covariance->sample_prior();
         mn->sample_prior();
     }
 
     void sample_posterior() override
     {
-        iw->sample_posterior();
+        covariance->sample_posterior();
         mn->sample_posterior();
     }
 
     double log_marginal_likelihood() override
     {
-        marginal_log_likelihood = iw->log_marginal_likelihood();
+        if (covariance->is_fixed()) {
+            mn->calc_marginal_parameters();
+            marginal_log_likelihood = mn->log_marginal_likelihood();
+        } else {
+            marginal_log_likelihood = covariance->log_marginal_likelihood();
+        }
+
         return marginal_log_likelihood;
     }
 
     // Setters
-    void set_outcome(const arma::mat *outcome_)
+    void set_outcome(const arma::mat *outcome_) override
     {
-        model_base::set_outcome(outcome_);
-        iw->set_outcome(outcome);
+        likelihood_base::set_outcome(outcome_);
+        covariance->set_outcome(outcome);
         mn->set_outcome(outcome);
     }
 
     void set_likelihood_pars(arma::mat *data_mean_, arma::mat *cov_chol_)
     {
         mn->set_likelihood_pars(data_mean_, cov_chol_);
-        iw->set_likelihood_pars(data_mean_, cov_chol_);
+        covariance->set_likelihood_pars(data_mean_, cov_chol_);
     };
 
     // Getters
     arma::mat get_cov() const
     {
-        return iw->get_cov();
+        return covariance->get_cov();
     }
 
     arma::mat get_param() const
@@ -155,28 +170,31 @@ struct mvn_iw_model_ : public model_base
 {
 
     std::unique_ptr<mvn_regression_model_> mvn;
-    std::unique_ptr<iw_model_> iw;
+    std::unique_ptr<covariance_base> covariance;
 
     arma::mat data_cov_chol;
 
     mvn_iw_model_(std::unique_ptr<mvn_regression_model_> mvn_model_,
-                  std::unique_ptr<iw_model_> iw_model_)
-        : mvn(std::move(mvn_model_)), iw(std::move(iw_model_))
+        std::unique_ptr<covariance_base> covariance_model_)
+        : mvn(std::move(mvn_model_)), covariance(std::move(covariance_model_))
     {
-        mvn->data_cov_chol = iw->get_cov_chol_ptr();
-        iw->data_mean = mvn->get_prediction_ptr();
+        mvn->data_cov_chol = covariance->get_cov_chol_ptr();
+        covariance->data_mean = mvn->get_prediction_ptr();
         // iw->sample_prior();
     }
 
     void calc_posterior_parameters() override
     {
-        mvn->set_likelihood_pars(mvn->data_mean, iw->get_cov_chol_ptr());
+        // Probably redundant, if bugs occure, comment back in!
+        // mvn->set_likelihood_pars(
+        //     mvn->data_mean, 
+        //     covariance->get_cov_chol_ptr());
         mvn->calc_posterior_parameters();
     }
 
     void sample_prior() override
     {
-        iw->sample_prior();
+        covariance->sample_prior();
         mvn->sample_prior();
     }
 
@@ -184,8 +202,8 @@ struct mvn_iw_model_ : public model_base
     {
         mvn->sample_posterior();
         mvn->make_predictions();
-        iw->calc_posterior_parameters();
-        iw->sample_posterior();
+        covariance->calc_posterior_parameters();
+        covariance->sample_posterior();
     }
 
     double log_marginal_likelihood() override
@@ -193,25 +211,26 @@ struct mvn_iw_model_ : public model_base
         return 0.0;
     }
 
-    void set_outcome(const arma::mat *outcome_)
+    void set_outcome(const arma::mat *outcome_) override
     {
-        model_base::set_outcome(outcome_);
+        likelihood_base::set_outcome(outcome_);
         data_cov_chol = identity(n_time);
-        iw->set_outcome(outcome);
+        covariance->set_outcome(outcome);
         mvn->set_outcome(outcome);
     }
 
     // Setters
-    void set_likelihood_pars(arma::mat *data_mean_)
+    void set_likelihood_pars(arma::mat* data_mean_)
     {
-        mvn->set_likelihood_pars(data_mean_, iw->get_cov_chol_ptr());
-        iw->set_likelihood_pars(mvn->get_prediction_ptr(), &data_cov_chol);
+        mvn->set_likelihood_pars(data_mean_, covariance->get_cov_chol_ptr());
+        covariance->set_likelihood_pars(
+            mvn->get_prediction_ptr(), &data_cov_chol);
     };
 
     // Getters
     arma::mat get_cov() const
     {
-        return iw->get_cov();
+        return covariance->get_cov();
     }
 
     arma::mat get_param() const
