@@ -78,6 +78,7 @@ arma::mat pgas(
 
     // Initialize ancestor matrtix
     arma::umat ancestors(n_time - 1, n_particles, arma::fill::zeros);
+    arma::uword reference_ancestor;
 
     // Initialize noise matrix
     arma::mat noise(d_lat, n_particles - 1);
@@ -148,6 +149,35 @@ arma::mat pgas(
                 hsgp.basis_functions(x.slice(t - 1)),
                 covariate_dyn.col(t - 1), trans_mat, lat_covar);
 
+            // Reference particle ------
+            // Reference ancestor sampling moved forward for the correct 
+            // conditional resampling. 
+            // Set last particle state to state from the reference path
+            // Step 7 of Algorithm 2 in Svensson et al. 2016
+            x.slice(t).col(n_particles - 1) = x_ref.col(t); // X^N_(t+1)
+
+            // Sample an ancestor index for the reference particle
+            // Step 8 of Algorithm 2 in Svensson et al. 2016
+            // Calculate the density of predicting the reference particle from 
+            // each ancestor.
+            timer.tic("pgas_aweights");
+            weights_n = arma::trans(mat_logdnorm_unnorm_inv(
+                arma::vec(x.slice(t).col(n_particles - 1)),
+                x_pred, dyn_cov_inv));
+
+            // You can ignore the denominator here since it cancells accorss all
+            // weights
+            // Elementwise multiply weights and normal densities
+            // This step could also be skipped (kept for flexibility) since 
+            // log(weights.row(t - 1)) == 1
+            weights_n += log(weights.row(t - 1));
+            softmax(weights_n); // Normalize weights
+            timer.toc("pgas_aweights");
+
+            // Resample the ancestral path for the reference particle from the weights
+            reference_ancestor = multinomial_resampling(weights_n, 1)(0);
+
+            // Resample remaining ancestors ------
             // Systematically resample ancestor indices according to APF
             // look-ahead weights
             // Step 5 of Algorithm 2 in Svensson et al. 2016
@@ -160,13 +190,14 @@ arma::mat pgas(
                 arma::vec(y.col(t)),
                 y_pred, weights_cov_inv));
             softmax(weights_n);
-            ancestors.row(t - 1).subvec(0, n_particles - 2) =
-                systematic_resampling(weights_n, n_particles - 1);
+            ancestors.row(t - 1) = conditional_systematic_resampling(
+                    weights_n, reference_ancestor); 
 
             // Resample predictions according to ancestor indices
             x_pred_resampled.cols(0, n_particles - 2) =
                 x_pred.cols(ancestors.row(t - 1).subvec(0, (n_particles - 2)));
 
+            // Calculate proposal distribution mean for each ancestor -----
             // Make observation prediction based on one-step state forecast
             y_pred.cols(0, n_particles - 2) = meas_model(
                 x_pred_resampled.cols(0, n_particles - 2),
@@ -183,34 +214,14 @@ arma::mat pgas(
             // Sample a new state values around the prediction in a vectorised
             // fashion and store in x for the next time point
             noise.randn();
-            // x.slice(t).submat(0, 0, d_lat - 1, n_particles - 2) =
-            //     x_pred.cols(ancestors.row(t - 1).subvec(0, (n_particles - 2))) + dyn_cov_chol * noise;
+
+            // Sample new particles from proposal distribution ------
             x.slice(t).submat(0, 0, d_lat - 1, n_particles - 2) =
                 prop_mean.cols(0, n_particles - 2) + prop_cov_chol * noise;
 
-            // Set last particle state to state from the reference path
-            // Step 7 of Algorithm 2 in Svensson et al. 2016
-            x.slice(t).col(n_particles - 1) = x_ref.col(t); // X^N_(t+1)
             timer.toc("pgas_move");
-            // Sample an ancestor index for the reference particle
-            // Step 8 of Algorithm 2 in Svensson et al. 2016
-            // Calculate the density of predicting the reference particle from each
-            timer.tic("pgas_aweights");
-            weights_n = arma::trans(mat_logdnorm_unnorm_inv(
-                arma::vec(x.slice(t).col(n_particles - 1)),
-                x_pred, dyn_cov_inv));
 
-            // You can ignore the denominator here since it cancells accorss all
-            // weights
-            // Elementwise multiply weights and normal densities
-            weights_n += log(weights.row(t - 1));
-            softmax(weights_n); // Normalize weights
-            timer.toc("pgas_aweights");
-            // Resample the ancestral path for the reference particle from the weights
             timer.tic("pgas_weights");
-            ancestors.row(t - 1)(n_particles - 1) = systematic_resampling(
-                weights_n, 1)(0);
-
             // Fully adapted APF weights are constant after propagation.
             weights.row(t).zeros();
             timer.toc("pgas_weights");
@@ -224,7 +235,7 @@ arma::mat pgas(
 
     // Sample an index from the weights at the last time point
     // Step 11 of Algorithm 2 in Svensson et al. 2016
-    arma::uword star = systematic_resampling(weights.row(n_time - 1), 1)(0);
+    arma::uword star = multinomial_resampling(weights.row(n_time - 1), 1)(0);
 
     // Trace the ancestral path of the selected index particle and combine
     // all its ancestors into the output sample stored in x_out
@@ -272,6 +283,7 @@ arma::mat pgas(
 
     // Initialize ancestor matrtix
     arma::umat ancestors(n_time - 1, n_particles, arma::fill::zeros);
+    arma::uword reference_ancestor;
 
     // Precalculate parmaters for proposal distribution
     // Precompute parameters for proposal distribution
@@ -355,7 +367,35 @@ arma::mat pgas(
     {
         if (t >= 1)
         {
-            // Ancestor sampling -----
+            // Reference particle ------
+            // Reference ancestor sampling moved forward for the correct 
+            // conditional resampling. 
+            // Calculate ancestor weights for reference particle
+            for (arma::uword i = 0; i < n_particles; i++)
+            {
+                // Sample ancestor index for reference particle
+                if (t < n_time - 1)
+                {
+                    // Current test data is x_t-1
+                    multi_output_gp[i].append_test_data(x_ref.cols(t, n_time - 2));
+                    multi_output_gp[i].append_test_y_cov_I();
+                    // Test data is x_t-1:T-1
+                }
+                weights_n(i) = multi_output_gp[i].test_marginal_log_likelihood(
+                    x_ref_adj.cols(t, n_time - 1));
+                // According to P(X_t:T | X'_0:t-1)
+
+                // Reset test data to only x_t-1
+                multi_output_gp[i].reset_test_data();
+                multi_output_gp[i].reset_test_y_cov();
+            }
+
+            weights_n += log(weights.row(t - 1));
+            softmax(weights_n); // Normalize weights
+
+            reference_ancestor = multinomial_resampling(weights_n, 1)(0);
+
+            // Resample remaining ancestors ------
             // Systematically resample ancestor indices according to APF
             // look-ahead weights for particles 1:N-1
             BZ = lat_covar * covariate_dyn.col(t - 1);
@@ -382,34 +422,9 @@ arma::mat pgas(
 
             weights_n += log(weights.row(t - 1));
             softmax(weights_n);
-            ancestors.row(t - 1).subvec(0, n_particles - 2) =
-                systematic_resampling(weights_n, n_particles - 1);
-
-            // Calculate ancestor weights for reference particle
-            for (arma::uword i = 0; i < n_particles; i++)
-            {
-                // Sample ancestor index for reference particle
-                if (t < n_time - 1)
-                {
-                    // Current test data is x_t-1
-                    multi_output_gp[i].append_test_data(x_ref.cols(t, n_time - 2));
-                    multi_output_gp[i].append_test_y_cov_I();
-                    // Test data is x_t-1:T-1
-                }
-                weights_n(i) = multi_output_gp[i].test_marginal_log_likelihood(
-                    x_ref_adj.cols(t, n_time - 1));
-                // According to P(X_t:T | X'_0:t-1)
-
-                // Reset test data to only x_t-1
-                multi_output_gp[i].reset_test_data();
-                multi_output_gp[i].reset_test_y_cov();
-            }
-
-            weights_n += log(weights.row(t - 1));
-            softmax(weights_n); // Normalize weights
-
-            ancestors.row(t - 1)(n_particles - 1) = systematic_resampling(
-                weights_n, 1)(0);
+            
+            ancestors.row(t - 1) = conditional_systematic_resampling(
+                weights_n, reference_ancestor);
 
             // Particle propagation -----
             // resample particles according to ancestor indices
@@ -495,7 +510,7 @@ arma::mat pgas(
     arma::mat x_out(d_lat, n_time, arma::fill::zeros);
 
     // Sample an index from the weights at the last time point
-    arma::uword star = systematic_resampling(weights.row(n_time - 1), 1)(0);
+    arma::uword star = multinomial_resampling(weights.row(n_time - 1), 1)(0);
 
     // Trace the ancestral path of the selected index particle and combine
     // all its ancestors into the output sample stored in x_out
